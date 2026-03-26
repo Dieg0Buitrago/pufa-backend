@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { PerfilProveedor } from './entities/perfil-proveedor.entity';
@@ -8,6 +8,8 @@ import { CategoriaProveedor } from './entities/categoria-proveedor.entity';
 import { SubcategoriaProveedor } from './entities/subcategoria-proveedor.entity';
 import { EspecialidadProveedor } from './entities/especialidad-proveedor.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { GuardarPerfilProveedorDto } from './dto/guardar-perfil-proveedor.dto';
+import { GuardarPerfilProductoraDto } from './dto/guardar-perfil-productora.dto';
 
 @Injectable()
 export class PerfilesService {
@@ -31,10 +33,17 @@ export class PerfilesService {
   }
 
   // Crea o actualiza el perfil de proveedor
-  async guardarPerfilProveedor(
-    usuarioId: number,
-    datos: Partial<PerfilProveedor> & { subcategoria_ids?: number[]; especialidad_ids?: number[] },
-  ) {
+  async guardarPerfilProveedor(usuarioId: number, datos: GuardarPerfilProveedorDto) {
+    // Valida que el usuario tenga tipo de perfil proveedor
+    const usuario = await this.usuariosRepo.findOne({
+      where: { id: usuarioId },
+      relations: ['tipo_perfil'],
+    });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.tipo_perfil?.codigo !== 'proveedor') {
+      throw new ForbiddenException('Solo los usuarios con perfil proveedor pueden completar este formulario');
+    }
+
     let perfil = await this.perfilesProveedorRepo.findOne({
       where: { usuario_id: usuarioId },
       relations: ['subcategorias', 'especialidades'],
@@ -70,7 +79,16 @@ export class PerfilesService {
   }
 
   // Crea o actualiza perfil de productora
-  async guardarPerfilProductora(usuarioId: number, datos: Partial<PerfilProductora>) {
+  async guardarPerfilProductora(usuarioId: number, datos: GuardarPerfilProductoraDto) {
+    const usuario = await this.usuariosRepo.findOne({
+      where: { id: usuarioId },
+      relations: ['tipo_perfil'],
+    });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.tipo_perfil?.codigo !== 'productora') {
+      throw new ForbiddenException('Solo los usuarios con perfil productora pueden completar este formulario');
+    }
+
     let perfil = await this.perfilesProductoraRepo.findOne({ where: { usuario_id: usuarioId } });
     if (!perfil) {
       perfil = this.perfilesProductoraRepo.create({ usuario_id: usuarioId });

@@ -63,4 +63,9 @@ export class CatalogosController {
   @Get('estados-pago')
   @ApiOperation({ summary: 'Estados posibles de un pago' })
   estadosPago() { return this.catalogosService.obtenerEstadosPago(); }
+
+  @Public()
+  @Get('tipos-perfil')
+  @ApiOperation({ summary: 'Tipos de perfil de usuario (productora, proveedor, academico)' })
+  tiposPerfil() { return this.catalogosService.obtenerTiposPerfil(); }
 }

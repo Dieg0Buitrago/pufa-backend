@@ -12,6 +12,7 @@ import { NivelEducativo } from './entities/nivel-educativo.entity';
 import { TipoTramite } from './entities/tipo-tramite.entity';
 import { TipoPago } from './entities/tipo-pago.entity';
 import { EstadoPago } from './entities/estado-pago.entity';
+import { TipoPerfil } from './entities/tipo-perfil.entity';
 
 // Servicio de catálogos — datos de referencia sin lógica de negocio compleja
 @Injectable()
@@ -28,6 +29,7 @@ export class CatalogosService {
     @InjectRepository(TipoTramite) private tiposTramiteRepo: Repository<TipoTramite>,
     @InjectRepository(TipoPago) private tiposPagoRepo: Repository<TipoPago>,
     @InjectRepository(EstadoPago) private estadosPagoRepo: Repository<EstadoPago>,
+    @InjectRepository(TipoPerfil) private tiposPerfilRepo: Repository<TipoPerfil>,
   ) {}
 
   obtenerMunicipios() {
@@ -72,5 +74,9 @@ export class CatalogosService {
 
   obtenerEstadosPago() {
     return this.estadosPagoRepo.find({ where: { activo: true } });
+  }
+
+  obtenerTiposPerfil() {
+    return this.tiposPerfilRepo.find({ where: { activo: true }, order: { id: 'ASC' } });
   }
 }

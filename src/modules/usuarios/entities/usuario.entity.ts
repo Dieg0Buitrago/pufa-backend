@@ -1,9 +1,10 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn, OneToOne, ManyToOne, JoinColumn,
+  CreateDateColumn, UpdateDateColumn, OneToOne, ManyToOne, JoinColumn, OneToMany,
 } from 'typeorm';
 import { EstadoCuenta } from '../../catalogos/entities/estado-cuenta.entity';
 import { TipoPerfil } from '../../catalogos/entities/tipo-perfil.entity';
+import { UsuarioRol } from '../../auth/entities/usuario-rol.entity';
 
 @Entity('usuarios')
 export class Usuario {
@@ -51,4 +52,7 @@ export class Usuario {
   @ManyToOne(() => TipoPerfil)
   @JoinColumn({ name: 'tipo_perfil_id' })
   tipo_perfil: TipoPerfil;
+
+  @OneToMany(() => UsuarioRol, (ur) => ur.usuario)
+  usuario_roles: UsuarioRol[];
 }

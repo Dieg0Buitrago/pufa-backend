@@ -52,7 +52,7 @@ async function seed() {
     await qr.query(`
       INSERT INTO roles (codigo, nombre, descripcion, activo) VALUES
         ('admin', 'Administrador', 'Acceso total al sistema', true),
-        ('solicitante', 'Solicitante', 'Crear y gestionar sus propios trámites', true),
+        ('productora', 'Productora', 'Crear y gestionar sus propios trámites', true),
         ('proveedor', 'Proveedor', 'Gestionar su perfil y disponibilidad en el directorio', true),
         ('academico', 'Académico', 'Acceso de aprendizaje y consulta', true),
         ('revisor', 'Revisor', 'Revisar y aprobar trámites asignados', true)

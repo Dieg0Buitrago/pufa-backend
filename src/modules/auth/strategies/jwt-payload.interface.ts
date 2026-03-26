@@ -5,4 +5,5 @@ export interface JwtPayload {
   roles: string[];    // Códigos de roles asignados
   permisos: string[]; // Códigos de permisos (para no consultar BD en cada request)
   tipoPerfil: string;
+  estadoCuenta: string; // Código del estado de la cuenta (pendiente, activo, etc.)
 }

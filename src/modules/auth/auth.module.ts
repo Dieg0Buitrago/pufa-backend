@@ -13,6 +13,8 @@ import { RolPermiso } from './entities/rol-permiso.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { EstadoCuenta } from '../catalogos/entities/estado-cuenta.entity';
 import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
+import { SolicitudRegistro } from '../registro/entities/solicitud-registro.entity';
+import { HistorialSolicitudRegistro } from '../registro/entities/historial-solicitud-registro.entity';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
       Usuario,
       EstadoCuenta,
       TipoPerfil,
+      SolicitudRegistro,
+      HistorialSolicitudRegistro,
     ]),
   ],
   controllers: [AuthController],

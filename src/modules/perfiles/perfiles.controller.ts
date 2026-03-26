@@ -7,6 +7,8 @@ import {
   ApiParam, ApiQuery,
 } from '@nestjs/swagger';
 import { PerfilesService } from './perfiles.service';
+import { GuardarPerfilProveedorDto } from './dto/guardar-perfil-proveedor.dto';
+import { GuardarPerfilProductoraDto } from './dto/guardar-perfil-productora.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -57,7 +59,7 @@ export class PerfilesController {
   @ApiResponse({ status: 200, description: 'Perfil de proveedor guardado.' })
   guardarPerfilProveedor(
     @CurrentUser('id') usuarioId: number,
-    @Body() datos: any,
+    @Body() datos: GuardarPerfilProveedorDto,
   ) {
     return this.perfilesService.guardarPerfilProveedor(usuarioId, datos);
   }
@@ -68,7 +70,7 @@ export class PerfilesController {
   @ApiResponse({ status: 200, description: 'Perfil de productora guardado.' })
   guardarPerfilProductora(
     @CurrentUser('id') usuarioId: number,
-    @Body() datos: any,
+    @Body() datos: GuardarPerfilProductoraDto,
   ) {
     return this.perfilesService.guardarPerfilProductora(usuarioId, datos);
   }

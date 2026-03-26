@@ -13,6 +13,8 @@ import { UsuarioRol } from './entities/usuario-rol.entity';
 import { RolPermiso } from './entities/rol-permiso.entity';
 import { EstadoCuenta } from '../catalogos/entities/estado-cuenta.entity';
 import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
+import { SolicitudRegistro } from '../registro/entities/solicitud-registro.entity';
+import { HistorialSolicitudRegistro } from '../registro/entities/historial-solicitud-registro.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegistroUsuarioDto } from './dto/registro-usuario.dto';
 import { CambiarPasswordDto } from './dto/cambiar-password.dto';
@@ -35,6 +37,10 @@ export class AuthService {
     private estadosCuentaRepo: Repository<EstadoCuenta>,
     @InjectRepository(TipoPerfil)
     private tiposPerfilRepo: Repository<TipoPerfil>,
+    @InjectRepository(SolicitudRegistro)
+    private solicitudesRepo: Repository<SolicitudRegistro>,
+    @InjectRepository(HistorialSolicitudRegistro)
+    private historialRepo: Repository<HistorialSolicitudRegistro>,
     private jwtService: JwtService,
   ) {}
 
@@ -52,6 +58,13 @@ export class AuthService {
       throw new BadRequestException('Estado de cuenta pendiente no configurado en el sistema');
     }
 
+    const tipoPerfil = await this.tiposPerfilRepo.findOne({
+      where: { id: dto.tipo_perfil_id, activo: true },
+    });
+    if (!tipoPerfil) {
+      throw new BadRequestException('El tipo de perfil seleccionado no existe o no está disponible');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const nuevoUsuario = this.usuariosRepo.create({
@@ -60,9 +73,27 @@ export class AuthService {
       tipo_persona: dto.tipo_persona,
       telefono: dto.telefono,
       estado_cuenta_id: estadoPendiente.id,
+      tipo_perfil_id: tipoPerfil.id,
     });
 
     const usuarioGuardado = await this.usuariosRepo.save(nuevoUsuario);
+
+    // Crea automáticamente la solicitud de registro para revisión del admin
+    const solicitud = await this.solicitudesRepo.save(
+      this.solicitudesRepo.create({
+        usuario_id: usuarioGuardado.id,
+        estado_solicitud: 'pendiente',
+      }),
+    );
+    await this.historialRepo.save(
+      this.historialRepo.create({
+        solicitud_registro_id: solicitud.id,
+        estado_nuevo: 'pendiente',
+        usuario_actor_id: usuarioGuardado.id,
+        accion: 'ENVIO_SOLICITUD',
+        observacion: 'Solicitud creada automáticamente al registrarse',
+      }),
+    );
 
     return {
       mensaje: 'Registro exitoso. Su cuenta está pendiente de aprobación por un administrador.',
@@ -87,7 +118,10 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
 
-    if (usuario.estado_cuenta?.codigo !== 'activo') {
+    // Solo se bloquea el login si la cuenta está inactiva o suspendida
+    // Las cuentas en estado 'pendiente' pueden hacer login para enviar su solicitud de registro
+    const estadosBloqueados = ['suspendido', 'rechazado'];
+    if (estadosBloqueados.includes(usuario.estado_cuenta?.codigo)) {
       throw new UnauthorizedException(
         `Su cuenta se encuentra en estado: ${usuario.estado_cuenta?.nombre ?? 'desconocido'}. Contacte al administrador.`,
       );
@@ -105,6 +139,7 @@ export class AuthService {
       roles: rolesPermisos.roles,
       permisos: rolesPermisos.permisos,
       tipoPerfil: usuario.tipo_perfil?.codigo ?? '',
+      estadoCuenta: usuario.estado_cuenta?.codigo ?? '',
     };
 
     return {
@@ -113,6 +148,7 @@ export class AuthService {
         id: usuario.id,
         email: usuario.email,
         tipo_persona: usuario.tipo_persona,
+        estado_cuenta: usuario.estado_cuenta?.codigo,
         roles: rolesPermisos.roles,
         tipo_perfil: usuario.tipo_perfil?.codigo,
       },

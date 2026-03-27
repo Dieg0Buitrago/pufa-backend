@@ -1,10 +1,11 @@
 import {
   Controller, Get, Post, Patch, Param, Body,
   ParseIntPipe, UseGuards, UseInterceptors, UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
 import {
   ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
   ApiParam, ApiConsumes, ApiBody,
@@ -44,7 +45,7 @@ export class DocumentosController {
   @UseInterceptors(
     FileInterceptor('archivo', {
       storage: diskStorage({
-        destination: './uploads',
+        destination: join(process.cwd(), 'uploads'),
         filename: (req, file, cb) => {
           const nombre = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
           cb(null, nombre);
@@ -60,6 +61,9 @@ export class DocumentosController {
     @Body('tramite_id', new ParseIntPipe({ optional: true })) tramiteId?: number,
     @Body('solicitud_registro_id', new ParseIntPipe({ optional: true })) solicitudId?: number,
   ) {
+    if (!archivo) {
+      throw new BadRequestException('No se recibió ningún archivo. Asegúrese de enviar el campo "archivo" con el archivo adjunto.');
+    }
     return this.documentosService.registrarDocumento(
       usuarioId, archivo, tipoDocumentoId, tramiteId, solicitudId,
     );

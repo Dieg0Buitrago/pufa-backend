@@ -12,6 +12,7 @@ import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
 import { PersonaNatural } from '../usuarios/entities/persona-natural.entity';
 import { PersonaJuridica } from '../usuarios/entities/persona-juridica.entity';
 import { PerfilProductora } from '../perfiles/entities/perfil-productora.entity';
+import { Documento } from '../documentos/entities/documento.entity';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PerfilProductora } from '../perfiles/entities/perfil-productora.entity'
       PersonaNatural,
       PersonaJuridica,
       PerfilProductora,
+      Documento,
     ]),
   ],
   controllers: [RegistroController],

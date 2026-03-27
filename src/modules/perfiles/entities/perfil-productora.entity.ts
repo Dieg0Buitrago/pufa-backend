@@ -4,7 +4,8 @@ import {
   CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
-import { RangoExperienciaSector } from '../../catalogos/entities/rango-experiencia-sector.entity';
+import { TipoIdentificacion } from '../../catalogos/entities/tipo-identificacion.entity';
+import { Municipio } from '../../catalogos/entities/municipio.entity';
 
 @Entity('perfiles_productora')
 export class PerfilProductora {
@@ -14,23 +15,35 @@ export class PerfilProductora {
   @Column({ unique: true })
   usuario_id: number;
 
-  @Column({ length: 255, nullable: true })
-  nombre_publico: string;
+  @Column({ length: 100, nullable: true })
+  primer_nombre: string;
+
+  @Column({ length: 100, nullable: true })
+  segundo_nombre: string;
+
+  @Column({ length: 100, nullable: true })
+  primer_apellido: string;
+
+  @Column({ length: 100, nullable: true })
+  segundo_apellido: string;
 
   @Column({ nullable: true })
-  experiencia_sector_id: number;
+  tipo_identificacion_id: number;
+
+  @Column({ length: 50, nullable: true })
+  numero_documento: string;
+
+  @Column({ nullable: true })
+  municipio_id: number;
+
+  @Column({ length: 255, nullable: true })
+  nombre_publico: string;
 
   @Column({ type: 'text', nullable: true })
   descripcion_empresa: string;
 
   @Column({ length: 255, nullable: true })
   sitio_web: string;
-
-  @Column({ default: true })
-  visible_directorio: boolean;
-
-  @Column({ default: false })
-  verificado: boolean;
 
   @CreateDateColumn()
   fecha_creacion: Date;
@@ -42,7 +55,11 @@ export class PerfilProductora {
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario;
 
-  @ManyToOne(() => RangoExperienciaSector)
-  @JoinColumn({ name: 'experiencia_sector_id' })
-  experiencia_sector: RangoExperienciaSector;
+  @ManyToOne(() => TipoIdentificacion)
+  @JoinColumn({ name: 'tipo_identificacion_id' })
+  tipo_identificacion: TipoIdentificacion;
+
+  @ManyToOne(() => Municipio)
+  @JoinColumn({ name: 'municipio_id' })
+  municipio: Municipio;
 }

@@ -5,7 +5,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CrearPersonaNaturalDto {
-  @ApiProperty({ example: 'María', description: 'Primer nombre' })
+  @ApiProperty({ example: 'María' })
   @IsString()
   primer_nombre: string;
 
@@ -28,7 +28,7 @@ export class CrearPersonaNaturalDto {
   @IsNumber()
   tipo_identificacion_id?: number;
 
-  @ApiProperty({ example: '1012345678', description: 'Número de documento de identidad' })
+  @ApiProperty({ example: '1012345678' })
   @IsString()
   numero_documento: string;
 
@@ -41,6 +41,11 @@ export class CrearPersonaNaturalDto {
   @IsOptional()
   @IsString()
   direccion?: string;
+
+  @ApiPropertyOptional({ example: 'Tunja', description: 'Ciudad o municipio de nacimiento' })
+  @IsOptional()
+  @IsString()
+  lugar_nacimiento?: string;
 
   @ApiPropertyOptional({ example: '1995-06-15', description: 'Fecha de nacimiento (YYYY-MM-DD)' })
   @IsOptional()
@@ -62,7 +67,7 @@ export class CrearPersonaNaturalDto {
   @IsBoolean()
   pertenece_grupo_etnico?: boolean;
 
-  @ApiPropertyOptional({ example: null })
+  @ApiPropertyOptional({ example: 1, description: 'ID del grupo étnico (ver /catalogos/grupos-etnicos)' })
   @IsOptional()
   @IsNumber()
   grupo_etnico_id?: number;
@@ -72,7 +77,7 @@ export class CrearPersonaNaturalDto {
   @IsBoolean()
   tiene_discapacidad?: boolean;
 
-  @ApiPropertyOptional({ example: null })
+  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de discapacidad (ver /catalogos/tipos-discapacidad)' })
   @IsOptional()
   @IsNumber()
   tipo_discapacidad_id?: number;
@@ -101,6 +106,36 @@ export class CrearPersonaNaturalDto {
   @IsOptional()
   @IsNumber()
   nivel_educativo_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del tiempo de dedicación al sector (ver /catalogos/tiempos-dedicacion-sector)' })
+  @IsOptional()
+  @IsNumber()
+  tiempo_dedicacion_sector_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de ingresos del sector (ver /catalogos/tipos-ingresos-sector)' })
+  @IsOptional()
+  @IsNumber()
+  ingresos_provienen_sector_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de propiedad de equipos (ver /catalogos/tipos-propiedad-equipos)' })
+  @IsOptional()
+  @IsNumber()
+  equipos_propios_tipo_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID de la gama de equipos (ver /catalogos/gamas-equipos)' })
+  @IsOptional()
+  @IsNumber()
+  gama_equipos_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del rango de experiencia en el sector (ver /catalogos/rangos-experiencia-sector)' })
+  @IsOptional()
+  @IsNumber()
+  tiempo_experiencia_sector_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de producción en que participa (ver /catalogos/tipos-produccion-participa)' })
+  @IsOptional()
+  @IsNumber()
+  produccion_participa_id?: number;
 
   @ApiPropertyOptional({ example: 3, description: 'Nivel de inglés hablado del 0 (ninguno) al 5 (nativo)' })
   @IsOptional()

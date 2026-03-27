@@ -68,4 +68,59 @@ export class CatalogosController {
   @Get('tipos-perfil')
   @ApiOperation({ summary: 'Tipos de perfil de usuario (productora, proveedor, academico)' })
   tiposPerfil() { return this.catalogosService.obtenerTiposPerfil(); }
+
+  @Public()
+  @Get('tipos-documento')
+  @ApiOperation({ summary: 'Tipos de documento aceptados para subir archivos' })
+  tiposDocumento() { return this.catalogosService.obtenerTiposDocumento(); }
+
+  @Public()
+  @Get('tipos-entidad')
+  @ApiOperation({ summary: 'Tipos de entidad jurídica (Sociedad, ESAL, EICE, etc.)' })
+  tiposEntidad() { return this.catalogosService.obtenerTiposEntidad(); }
+
+  @Public()
+  @Get('sexos-nacer')
+  @ApiOperation({ summary: 'Opciones de sexo al nacer' })
+  sexosNacer() { return this.catalogosService.obtenerSexosNacer(); }
+
+  @Public()
+  @Get('grupos-etnicos')
+  @ApiOperation({ summary: 'Grupos étnicos reconocidos' })
+  gruposEtnicos() { return this.catalogosService.obtenerGruposEtnicos(); }
+
+  @Public()
+  @Get('tipos-discapacidad')
+  @ApiOperation({ summary: 'Tipos de discapacidad' })
+  tiposDiscapacidad() { return this.catalogosService.obtenerTiposDiscapacidad(); }
+
+  @Public()
+  @Get('tiempos-dedicacion-sector')
+  @ApiOperation({ summary: 'Opciones de tiempo de dedicación al sector audiovisual' })
+  tiemposDedicacionSector() { return this.catalogosService.obtenerTiemposDedicacionSector(); }
+
+  @Public()
+  @Get('tipos-ingresos-sector')
+  @ApiOperation({ summary: 'Tipos de ingresos provenientes del sector audiovisual' })
+  tiposIngresosSector() { return this.catalogosService.obtenerTiposIngresosSector(); }
+
+  @Public()
+  @Get('tipos-propiedad-equipos')
+  @ApiOperation({ summary: 'Tipos de propiedad de equipos (propios, arrendados, etc.)' })
+  tiposPropiedadEquipos() { return this.catalogosService.obtenerTiposPropiedadEquipos(); }
+
+  @Public()
+  @Get('gamas-equipos')
+  @ApiOperation({ summary: 'Gamas de equipos audiovisuales (básica, profesional, etc.)' })
+  gamasEquipos() { return this.catalogosService.obtenerGamasEquipos(); }
+
+  @Public()
+  @Get('rangos-experiencia-sector')
+  @ApiOperation({ summary: 'Rangos de experiencia en el sector audiovisual' })
+  rangosExperienciaSector() { return this.catalogosService.obtenerRangosExperienciaSector(); }
+
+  @Public()
+  @Get('tipos-produccion-participa')
+  @ApiOperation({ summary: 'Tipos de producción en los que participa el agente' })
+  tiposProduccionParticipa() { return this.catalogosService.obtenerTiposProduccionParticipa(); }
 }

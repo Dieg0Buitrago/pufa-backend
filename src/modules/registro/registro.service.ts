@@ -11,6 +11,7 @@ import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
 import { PersonaNatural } from '../usuarios/entities/persona-natural.entity';
 import { PersonaJuridica } from '../usuarios/entities/persona-juridica.entity';
 import { PerfilProductora } from '../perfiles/entities/perfil-productora.entity';
+import { Documento } from '../documentos/entities/documento.entity';
 
 // Mapeo de tipo de perfil al código de rol correspondiente
 const PERFIL_ROL_MAP: Record<string, string> = {
@@ -42,17 +43,39 @@ export class RegistroService {
     private personasJuridicasRepo: Repository<PersonaJuridica>,
     @InjectRepository(PerfilProductora)
     private perfilesProductoraRepo: Repository<PerfilProductora>,
+    @InjectRepository(Documento)
+    private documentosRepo: Repository<Documento>,
   ) {}
 
-  // Crea solicitud de registro para el usuario autenticado
+  // Crea o reactiva la solicitud de registro para el usuario autenticado
   async crearSolicitud(usuarioId: number) {
-    const existente = await this.solicitudesRepo.findOne({
+    // Si ya tiene una solicitud pendiente, no puede crear otra
+    const pendiente = await this.solicitudesRepo.findOne({
       where: { usuario_id: usuarioId, estado_solicitud: 'pendiente' },
     });
-    if (existente) {
+    if (pendiente) {
       throw new BadRequestException('Ya tiene una solicitud de registro pendiente');
     }
 
+    // Si tiene una solicitud en subsanación, la reactiva a pendiente
+    const enSubsanacion = await this.solicitudesRepo.findOne({
+      where: { usuario_id: usuarioId, estado_solicitud: 'subsanacion' },
+    });
+    if (enSubsanacion) {
+      const estadoAnterior = enSubsanacion.estado_solicitud;
+      enSubsanacion.estado_solicitud = 'pendiente';
+      enSubsanacion.fecha_envio = new Date();
+      await this.solicitudesRepo.save(enSubsanacion);
+
+      await this.registrarHistorial(
+        enSubsanacion.id, estadoAnterior, 'pendiente', usuarioId,
+        'REENVIO_SOLICITUD', 'Usuario corrigió la información y reenvió la solicitud',
+      );
+
+      return { mensaje: 'Solicitud reenviada exitosamente. El administrador la revisará nuevamente.' };
+    }
+
+    // Si no existe ninguna, crea una nueva
     const solicitud = this.solicitudesRepo.create({
       usuario_id: usuarioId,
       estado_solicitud: 'pendiente',
@@ -95,6 +118,7 @@ export class RegistroService {
     solicitud.estado_solicitud = nuevoEstado;
     solicitud.admin_revisor_id = adminId;
     solicitud.observaciones_admin = observaciones;
+    solicitud.fecha_revision = new Date();
     solicitud.fecha_respuesta = new Date();
 
     if (nuevoEstado === 'subsanacion') {
@@ -102,6 +126,44 @@ export class RegistroService {
     }
 
     await this.solicitudesRepo.save(solicitud);
+
+    // Si es persona jurídica, verifica que todos los documentos estén aprobados antes de activar
+    if (nuevoEstado === 'aprobado') {
+      const usuario = await this.usuariosRepo.findOne({
+        where: { id: solicitud.usuario_id },
+        relations: ['tipo_perfil'],
+      });
+
+      if (usuario?.tipo_persona === 'juridica') {
+        const documentosPendientes = await this.documentosRepo.count({
+          where: {
+            solicitud_registro_id: solicitudId,
+            estado_validacion: 'pendiente',
+            activo: true,
+          },
+        });
+
+        const documentosRechazados = await this.documentosRepo.count({
+          where: {
+            solicitud_registro_id: solicitudId,
+            estado_validacion: 'rechazado',
+            activo: true,
+          },
+        });
+
+        if (documentosPendientes > 0) {
+          throw new BadRequestException(
+            `No se puede aprobar la solicitud. Hay ${documentosPendientes} documento(s) pendiente(s) de validación.`,
+          );
+        }
+
+        if (documentosRechazados > 0) {
+          throw new BadRequestException(
+            `No se puede aprobar la solicitud. Hay ${documentosRechazados} documento(s) rechazado(s). El usuario debe corregirlos.`,
+          );
+        }
+      }
+    }
 
     // Si se aprueba, activa la cuenta y asigna el rol según el tipo de perfil
     if (nuevoEstado === 'aprobado') {
@@ -157,32 +219,36 @@ export class RegistroService {
     const existe = await this.perfilesProductoraRepo.findOne({ where: { usuario_id: usuarioId } });
     if (existe) return;
 
-    let nombrePublico: string | undefined;
-    let descripcionEmpresa: string | undefined;
-    let sitioWeb: string | undefined;
+    let datos: Partial<PerfilProductora> = {};
 
     if (tipoPersona === 'natural') {
       const persona = await this.personasNaturalesRepo.findOne({ where: { usuario_id: usuarioId } });
       if (persona) {
         const partes = [persona.primer_nombre, persona.segundo_nombre, persona.primer_apellido, persona.segundo_apellido];
-        nombrePublico = partes.filter(Boolean).join(' ');
+        datos = {
+          primer_nombre: persona.primer_nombre,
+          segundo_nombre: persona.segundo_nombre,
+          primer_apellido: persona.primer_apellido,
+          segundo_apellido: persona.segundo_apellido,
+          tipo_identificacion_id: persona.tipo_identificacion_id,
+          numero_documento: persona.numero_documento,
+          municipio_id: persona.municipio_residencia_id,
+          nombre_publico: partes.filter(Boolean).join(' '),
+        };
       }
     } else if (tipoPersona === 'juridica') {
       const persona = await this.personasJuridicasRepo.findOne({ where: { usuario_id: usuarioId } });
       if (persona) {
-        nombrePublico = persona.razon_social;
-        descripcionEmpresa = persona.objeto_social;
-        sitioWeb = persona.pagina_web;
+        datos = {
+          nombre_publico: persona.razon_social,
+          descripcion_empresa: persona.objeto_social,
+          sitio_web: persona.pagina_web,
+        };
       }
     }
 
     await this.perfilesProductoraRepo.save(
-      this.perfilesProductoraRepo.create({
-        usuario_id: usuarioId,
-        nombre_publico: nombrePublico,
-        descripcion_empresa: descripcionEmpresa,
-        sitio_web: sitioWeb,
-      }),
+      this.perfilesProductoraRepo.create({ usuario_id: usuarioId, ...datos }),
     );
   }
 

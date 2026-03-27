@@ -77,6 +77,19 @@ export class PerfilesController {
 
   @ApiBearerAuth('JWT')
   @Roles('admin')
+  @Get('proveedores/pendientes')
+  @ApiOperation({ summary: 'Proveedores pendientes de verificación', description: 'Lista perfiles proveedor con verificado = false. Solo admin.' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  proveedoresPendientes(
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+  ) {
+    return this.perfilesService.listarProveedoresPendientes(page, limit);
+  }
+
+  @ApiBearerAuth('JWT')
+  @Roles('admin')
   @Patch('proveedores/:id/verificar')
   @ApiOperation({ summary: 'Verificar proveedor', description: 'Admin marca un proveedor como verificado, habilitándolo en el directorio público.' })
   @ApiParam({ name: 'id', description: 'ID del perfil de proveedor' })

@@ -759,6 +759,67 @@ async function seed() {
       `);
     }
 
+    // --- PERMISOS POR ROL ---
+
+    // Productora: crear y gestionar sus propios trámites, pagos y documentos
+    await qr.query(`
+      INSERT INTO rol_permisos (rol_id, permiso_id, activo)
+      SELECT r.id, p.id, true
+      FROM roles r, permisos p
+      WHERE r.codigo = 'productora'
+        AND p.codigo IN (
+          'tramites.ver', 'tramites.crear', 'tramites.editar',
+          'pagos.ver', 'pagos.registrar',
+          'documentos.subir',
+          'catalogos.ver',
+          'perfiles.ver', 'perfiles.gestionar'
+        )
+      ON CONFLICT DO NOTHING
+    `);
+
+    // Proveedor: gestionar su propio perfil y consultar catálogos
+    await qr.query(`
+      INSERT INTO rol_permisos (rol_id, permiso_id, activo)
+      SELECT r.id, p.id, true
+      FROM roles r, permisos p
+      WHERE r.codigo = 'proveedor'
+        AND p.codigo IN (
+          'catalogos.ver',
+          'perfiles.ver', 'perfiles.gestionar'
+        )
+      ON CONFLICT DO NOTHING
+    `);
+
+    // Académico: acceso de consulta a trámites y catálogos
+    await qr.query(`
+      INSERT INTO rol_permisos (rol_id, permiso_id, activo)
+      SELECT r.id, p.id, true
+      FROM roles r, permisos p
+      WHERE r.codigo = 'academico'
+        AND p.codigo IN (
+          'tramites.ver',
+          'catalogos.ver',
+          'perfiles.ver'
+        )
+      ON CONFLICT DO NOTHING
+    `);
+
+    // Revisor: revisar y aprobar trámites asignados por entidades externas
+    await qr.query(`
+      INSERT INTO rol_permisos (rol_id, permiso_id, activo)
+      SELECT r.id, p.id, true
+      FROM roles r, permisos p
+      WHERE r.codigo = 'revisor'
+        AND p.codigo IN (
+          'tramites.ver', 'tramites.aprobar', 'tramites.rechazar',
+          'documentos.validar',
+          'entidades.revisar',
+          'catalogos.ver',
+          'usuarios.ver'
+        )
+      ON CONFLICT DO NOTHING
+    `);
+
     await qr.commitTransaction();
     console.log('Seed completado exitosamente para PUFA-Backend');
     console.log('Admin inicial: admin@pufa.gov.co / Admin2024!');

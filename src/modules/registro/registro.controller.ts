@@ -7,6 +7,7 @@ import {
   ApiParam, ApiQuery, ApiBody,
 } from '@nestjs/swagger';
 import { RegistroService } from './registro.service';
+import { RevisarSolicitudDto } from './dto/revisar-solicitud.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -64,10 +65,9 @@ export class RegistroController {
   @ApiResponse({ status: 200, description: 'Solicitud actualizada.' })
   revisar(
     @Param('id', ParseIntPipe) id: number,
-    @Body('estado') estado: 'aprobado' | 'rechazado' | 'subsanacion',
-    @Body('observaciones') observaciones: string,
+    @Body() dto: RevisarSolicitudDto,
     @CurrentUser('id') adminId: number,
   ) {
-    return this.registroService.revisarSolicitud(id, adminId, estado, observaciones);
+    return this.registroService.revisarSolicitud(id, adminId, dto.estado, dto.observaciones);
   }
 }

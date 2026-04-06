@@ -65,6 +65,14 @@ export class AuthService {
       throw new BadRequestException('El tipo de perfil seleccionado no existe o no está disponible');
     }
 
+    if (tipoPerfil.codigo === 'academico' && dto.tipo_persona !== 'natural') {
+      throw new BadRequestException('El perfil académico solo está disponible para personas naturales');
+    }
+
+    if (tipoPerfil.codigo === 'revisor' && dto.tipo_persona !== 'natural') {
+      throw new BadRequestException('El perfil revisor solo está disponible para personas naturales');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const nuevoUsuario = this.usuariosRepo.create({

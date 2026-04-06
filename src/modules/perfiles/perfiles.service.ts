@@ -119,23 +119,4 @@ export class PerfilesService {
     return { data, total, page, lastPage: Math.ceil(total / limit) };
   }
 
-  // Lista proveedores pendientes de verificación (solo admin)
-  async listarProveedoresPendientes(page = 1, limit = 20) {
-    const [data, total] = await this.perfilesProveedorRepo.findAndCount({
-      where: { verificado: false },
-      relations: ['usuario', 'subcategorias', 'especialidades'],
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { fecha_creacion: 'ASC' },
-    });
-    return { data, total, page, lastPage: Math.ceil(total / limit) };
-  }
-
-  // Verifica un proveedor (solo admin)
-  async verificarProveedor(perfilId: number) {
-    const perfil = await this.perfilesProveedorRepo.findOne({ where: { id: perfilId } });
-    if (!perfil) throw new NotFoundException('Perfil de proveedor no encontrado');
-    await this.perfilesProveedorRepo.update(perfilId, { verificado: true });
-    return { mensaje: 'Proveedor verificado exitosamente' };
-  }
 }

@@ -6,10 +6,12 @@ import { Pago } from './entities/pago.entity';
 import { Abono } from './entities/abono.entity';
 import { EstadoPago } from '../catalogos/entities/estado-pago.entity';
 import { EstadoAbono } from '../catalogos/entities/estado-abono.entity';
+import { Tramite } from '../tramites/entities/tramite.entity';
+import { EstadoTramite } from '../catalogos/entities/estado-tramite.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Pago, Abono, EstadoPago, EstadoAbono]),
+    TypeOrmModule.forFeature([Pago, Abono, EstadoPago, EstadoAbono, Tramite, EstadoTramite]),
   ],
   controllers: [PagosController],
   providers: [PagosService],

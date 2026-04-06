@@ -44,7 +44,8 @@ async function seed() {
         ('admin', 'Administrador', 'Personal de la Secretaría de Cultura y Comisión Fílmica de Boyacá', true),
         ('productora', 'Productora', 'Empresa o persona que solicita permisos de rodaje', true),
         ('proveedor', 'Proveedor', 'Prestador de servicios audiovisuales registrado en el directorio', true),
-        ('academico', 'Académico', 'Estudiante o investigador con aval institucional', true)
+        ('academico', 'Académico', 'Estudiante o investigador con aval institucional', true),
+        ('revisor', 'Revisor', 'Funcionario encargado de revisar y emitir conceptos sobre trámites PUFA', true)
       ON CONFLICT (codigo) DO NOTHING
     `);
 
@@ -244,6 +245,32 @@ async function seed() {
       ON CONFLICT DO NOTHING
     `);
 
+    // --- ROLES DE EQUIPO TÉCNICO ---
+    await qr.query(`
+      INSERT INTO roles_equipo_tecnico (nombre, descripcion, activo) VALUES
+        ('Director/a', 'Director o directora de la producción audiovisual', true),
+        ('Productor/a', 'Productor o productora general del proyecto', true),
+        ('Director/a de fotografía', 'Responsable de la fotografía y cámara principal', true),
+        ('Operador/a de cámara', 'Operación de cámaras secundarias o de apoyo', true),
+        ('Sonidista', 'Responsable de la captura y mezcla de sonido directo', true),
+        ('Director/a de arte', 'Responsable del diseño de producción y escenografía', true),
+        ('Maquillador/a', 'Maquillaje y caracterización de actores', true),
+        ('Vestuarista', 'Diseño y gestión del vestuario de producción', true),
+        ('Gaffer', 'Jefe de iluminación eléctrica', true),
+        ('Script', 'Continuista o anotador/a de producción', true),
+        ('Asistente de dirección', 'Primer o segundo asistente de dirección', true),
+        ('Locacionista', 'Búsqueda y gestión de locaciones de rodaje', true),
+        ('Coordinador/a de producción', 'Coordinación logística y administrativa del rodaje', true),
+        ('Editor/a de video', 'Montaje y edición del material audiovisual', true),
+        ('Colorista', 'Corrección de color y etalonaje', true),
+        ('Actor/Actriz', 'Intérprete principal o secundario', true),
+        ('Extra', 'Figura de fondo o extra en la producción', true),
+        ('Piloto de dron', 'Operador certificado de aeronaves no tripuladas', true),
+        ('Conductor/a', 'Transporte del equipo técnico y logística', true),
+        ('Otro', 'Rol técnico no clasificado en las categorías anteriores', true)
+      ON CONFLICT DO NOTHING
+    `);
+
     // --- TIPOS DE TRÁMITE ---
     await qr.query(`
       INSERT INTO tipos_tramite (nombre, descripcion, activo) VALUES
@@ -317,21 +344,39 @@ async function seed() {
     `);
 
     // --- TIPOS DE DOCUMENTO ---
-    await qr.query(`
-      INSERT INTO tipos_documento (nombre, descripcion, aplica_a, obligatorio, activo) VALUES
-        ('Cédula de ciudadanía', 'Documento de identidad del representante o solicitante', 'registro', true, true),
-        ('RUT', 'Registro Único Tributario actualizado', 'registro', true, true),
-        ('Cámara de comercio', 'Certificado de existencia vigente (no mayor a 90 días)', 'registro', false, true),
-        ('Carta de intención del proyecto', 'Descripción detallada del proyecto de rodaje', 'tramite', true, true),
-        ('Plan de contingencia', 'Plan para el manejo de emergencias durante el rodaje', 'tramite', true, true),
-        ('Soporte de pago', 'Comprobante del pago o abono realizado', 'pago', true, true),
-        ('Permiso de Aeronáutica Civil', 'Autorización UAEAC para el uso de drones', 'tramite', false, true),
-        ('Plan de manejo de tránsito', 'Plan aprobado por la autoridad de tránsito competente', 'tramite', false, true),
-        ('Consentimiento de comunidades', 'Acta de consentimiento libre, previo e informado de comunidades étnicas', 'tramite', false, true),
-        ('Póliza de responsabilidad civil', 'Seguro de RC vigente para la producción', 'tramite', false, true),
-        ('Aval institucional', 'Carta de aval de la institución educativa (para trámites académicos)', 'tramite', false, true)
-      ON CONFLICT DO NOTHING
-    `);
+    // Actualiza los existentes y agrega los faltantes usando nombre como clave natural
+    const tiposDocumento = [
+      { nombre: 'Cédula de ciudadanía',                     descripcion: 'Documento de identidad del solicitante',                                             aplica_a: 'registro_natural',  obligatorio: true  },
+      { nombre: 'RUT',                                       descripcion: 'Registro Único Tributario actualizado',                                              aplica_a: 'registro_juridica', obligatorio: true  },
+      { nombre: 'Cámara de comercio',                        descripcion: 'Certificado de existencia y representación legal vigente (no mayor a 90 días)',      aplica_a: 'registro_juridica', obligatorio: true  },
+      { nombre: 'Acta de constitución',                      descripcion: 'Copia del acta de constitución de la persona jurídica',                             aplica_a: 'registro_juridica', obligatorio: true  },
+      { nombre: 'Acta de nombramiento de representante legal', descripcion: 'Acta vigente de nombramiento del representante legal',                            aplica_a: 'registro_juridica', obligatorio: true  },
+      { nombre: 'Carta de intención del proyecto',           descripcion: 'Descripción detallada del proyecto de rodaje',                                      aplica_a: 'tramite',           obligatorio: true  },
+      { nombre: 'Plan de contingencia',                      descripcion: 'Plan para el manejo de emergencias durante el rodaje',                               aplica_a: 'tramite',           obligatorio: true  },
+      { nombre: 'Soporte de pago',                           descripcion: 'Comprobante del pago o abono realizado',                                            aplica_a: 'pago',              obligatorio: true  },
+      { nombre: 'Permiso de Aeronáutica Civil',              descripcion: 'Autorización UAEAC para el uso de drones',                                          aplica_a: 'tramite',           obligatorio: false },
+      { nombre: 'Plan de manejo de tránsito',                descripcion: 'Plan aprobado por la autoridad de tránsito competente',                             aplica_a: 'tramite',           obligatorio: false },
+      { nombre: 'Consentimiento de comunidades',             descripcion: 'Acta de consentimiento libre, previo e informado de comunidades étnicas',           aplica_a: 'tramite',           obligatorio: false },
+      { nombre: 'Póliza de responsabilidad civil',           descripcion: 'Seguro de RC vigente para la producción',                                          aplica_a: 'tramite',           obligatorio: false },
+      { nombre: 'Aval institucional',                        descripcion: 'Carta de aval de la institución educativa (para trámites académicos)',              aplica_a: 'tramite',           obligatorio: false },
+    ];
+    for (const t of tiposDocumento) {
+      const existe = await qr.query(
+        `SELECT id FROM tipos_documento WHERE nombre = $1 LIMIT 1`,
+        [t.nombre],
+      );
+      if (existe.length > 0) {
+        await qr.query(
+          `UPDATE tipos_documento SET aplica_a = $1, obligatorio = $2 WHERE nombre = $3`,
+          [t.aplica_a, t.obligatorio, t.nombre],
+        );
+      } else {
+        await qr.query(
+          `INSERT INTO tipos_documento (nombre, descripcion, aplica_a, obligatorio, activo) VALUES ($1, $2, $3, $4, true)`,
+          [t.nombre, t.descripcion, t.aplica_a, t.obligatorio],
+        );
+      }
+    }
 
     // --- TIPOS DE CONVOCATORIA ---
     await qr.query(`

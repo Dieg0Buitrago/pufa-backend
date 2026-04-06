@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Pago } from './entities/pago.entity';
 import { Abono } from './entities/abono.entity';
 import { EstadoPago } from '../catalogos/entities/estado-pago.entity';
 import { EstadoAbono } from '../catalogos/entities/estado-abono.entity';
+import { Tramite } from '../tramites/entities/tramite.entity';
+import { EstadoTramite } from '../catalogos/entities/estado-tramite.entity';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
+
+// Estados del trámite que habilitan el pago
+const ESTADOS_TRAMITE_CON_PAGO = ['Aprobado', 'Aprobado con observaciones'];
 
 @Injectable()
 export class PagosService {
@@ -14,10 +19,25 @@ export class PagosService {
     @InjectRepository(Abono) private abonosRepo: Repository<Abono>,
     @InjectRepository(EstadoPago) private estadosPagoRepo: Repository<EstadoPago>,
     @InjectRepository(EstadoAbono) private estadosAbonoRepo: Repository<EstadoAbono>,
+    @InjectRepository(Tramite) private tramitesRepo: Repository<Tramite>,
+    @InjectRepository(EstadoTramite) private estadosTramiteRepo: Repository<EstadoTramite>,
   ) {}
 
-  // Registra un pago para un trámite
+  // Registra un pago para un trámite — solo si el trámite está aprobado
   async registrarPago(usuarioId: number, dto: RegistrarPagoDto) {
+    const tramite = await this.tramitesRepo.findOne({
+      where: { id: dto.tramite_id },
+      relations: ['estado_tramite'],
+    });
+    if (!tramite) throw new NotFoundException('Trámite no encontrado');
+
+    const estadoActual = tramite.estado_tramite?.nombre ?? '';
+    if (!ESTADOS_TRAMITE_CON_PAGO.includes(estadoActual)) {
+      throw new BadRequestException(
+        `No se puede registrar un pago. El trámite debe estar aprobado antes de realizar el pago. Estado actual: "${estadoActual}".`,
+      );
+    }
+
     const estadoPendiente = await this.estadosPagoRepo.findOne({
       where: { codigo: 'pendiente' },
     });

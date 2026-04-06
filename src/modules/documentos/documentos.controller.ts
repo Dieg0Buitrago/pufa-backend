@@ -1,9 +1,9 @@
 import {
   Controller, Get, Post, Patch, Param, Body,
-  ParseIntPipe, UseGuards, UseInterceptors, UploadedFile,
+  ParseIntPipe, UseGuards, UseInterceptors, UploadedFile, UploadedFiles,
   BadRequestException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import {
@@ -11,6 +11,7 @@ import {
   ApiParam, ApiConsumes, ApiBody,
 } from '@nestjs/swagger';
 import { DocumentosService } from './documentos.service';
+import { ValidarDocumentoDto } from './dto/validar-documento.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -69,6 +70,59 @@ export class DocumentosController {
     );
   }
 
+  @Post('subir-registro')
+  @ApiOperation({
+    summary: 'Subir documentos de registro (persona jurídica)',
+    description: 'Carga los 4 documentos obligatorios de registro en una sola petición: certificado de existencia, acta de constitución, RUT y acta de nombramiento.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        certificado_existencia: { type: 'string', format: 'binary', description: 'Cámara de comercio / certificado de existencia y representación legal' },
+        acta_constitucion:      { type: 'string', format: 'binary', description: 'Copia del acta de constitución' },
+        rut:                    { type: 'string', format: 'binary', description: 'RUT actualizado' },
+        acta_nombramiento:      { type: 'string', format: 'binary', description: 'Acta de nombramiento del representante legal' },
+        solicitud_registro_id:  { type: 'number', description: 'ID de la solicitud de registro' },
+      },
+      required: ['solicitud_registro_id'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Documentos registrados con hash SHA256.' })
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'certificado_existencia', maxCount: 1 },
+        { name: 'acta_constitucion',      maxCount: 1 },
+        { name: 'rut',                    maxCount: 1 },
+        { name: 'acta_nombramiento',      maxCount: 1 },
+      ],
+      {
+        storage: diskStorage({
+          destination: join(process.cwd(), 'uploads'),
+          filename: (req, file, cb) => {
+            const nombre = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
+            cb(null, nombre);
+          },
+        }),
+        limits: { fileSize: 10 * 1024 * 1024 },
+      },
+    ),
+  )
+  subirDocumentosRegistro(
+    @UploadedFiles() archivos: {
+      certificado_existencia?: Express.Multer.File[];
+      acta_constitucion?: Express.Multer.File[];
+      rut?: Express.Multer.File[];
+      acta_nombramiento?: Express.Multer.File[];
+    },
+    @CurrentUser('id') usuarioId: number,
+    @Body('solicitud_registro_id', ParseIntPipe) solicitudId: number,
+  ) {
+    return this.documentosService.registrarDocumentosJuridica(usuarioId, archivos, solicitudId);
+  }
+
   @Get('tramite/:tramiteId')
   @ApiOperation({ summary: 'Listar documentos de un trámite' })
   @ApiParam({ name: 'tramiteId', description: 'ID del trámite' })
@@ -94,9 +148,8 @@ export class DocumentosController {
   validar(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') adminId: number,
-    @Body('estado') estado: 'aprobado' | 'rechazado',
-    @Body('observaciones') observaciones?: string,
+    @Body() dto: ValidarDocumentoDto,
   ) {
-    return this.documentosService.validarDocumento(id, adminId, estado, observaciones);
+    return this.documentosService.validarDocumento(id, adminId, dto.estado_validacion, dto.observaciones_validacion);
   }
 }

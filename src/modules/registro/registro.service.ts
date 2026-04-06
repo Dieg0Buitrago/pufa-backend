@@ -7,17 +7,19 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { EstadoCuenta } from '../catalogos/entities/estado-cuenta.entity';
 import { Rol } from '../auth/entities/rol.entity';
 import { UsuarioRol } from '../auth/entities/usuario-rol.entity';
-import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
 import { PersonaNatural } from '../usuarios/entities/persona-natural.entity';
 import { PersonaJuridica } from '../usuarios/entities/persona-juridica.entity';
 import { PerfilProductora } from '../perfiles/entities/perfil-productora.entity';
+import { PerfilProveedor } from '../perfiles/entities/perfil-proveedor.entity';
 import { Documento } from '../documentos/entities/documento.entity';
+import { TipoDocumento } from '../catalogos/entities/tipo-documento.entity';
 
 // Mapeo de tipo de perfil al código de rol correspondiente
 const PERFIL_ROL_MAP: Record<string, string> = {
   productora: 'productora',
   proveedor: 'proveedor',
   academico: 'academico',
+  revisor: 'revisor',
 };
 
 @Injectable()
@@ -35,16 +37,18 @@ export class RegistroService {
     private rolesRepo: Repository<Rol>,
     @InjectRepository(UsuarioRol)
     private usuarioRolesRepo: Repository<UsuarioRol>,
-    @InjectRepository(TipoPerfil)
-    private tiposPerfilRepo: Repository<TipoPerfil>,
     @InjectRepository(PersonaNatural)
     private personasNaturalesRepo: Repository<PersonaNatural>,
     @InjectRepository(PersonaJuridica)
     private personasJuridicasRepo: Repository<PersonaJuridica>,
     @InjectRepository(PerfilProductora)
     private perfilesProductoraRepo: Repository<PerfilProductora>,
+    @InjectRepository(PerfilProveedor)
+    private perfilesProveedorRepo: Repository<PerfilProveedor>,
     @InjectRepository(Documento)
     private documentosRepo: Repository<Documento>,
+    @InjectRepository(TipoDocumento)
+    private tiposDocumentoRepo: Repository<TipoDocumento>,
   ) {}
 
   // Crea o reactiva la solicitud de registro para el usuario autenticado
@@ -115,6 +119,52 @@ export class RegistroService {
     if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
 
     const estadoAnterior = solicitud.estado_solicitud;
+
+    // Si es persona jurídica, verifica documentos ANTES de modificar nada
+    if (nuevoEstado === 'aprobado') {
+      const usuario = await this.usuariosRepo.findOne({
+        where: { id: solicitud.usuario_id },
+        relations: ['tipo_perfil'],
+      });
+
+      if (usuario?.tipo_persona === 'juridica') {
+        // Verifica que todos los documentos obligatorios de registro fueron subidos
+        const tiposObligatorios = await this.tiposDocumentoRepo.find({
+          where: { aplica_a: 'registro_juridica', obligatorio: true, activo: true },
+        });
+
+        const documentosSubidos = await this.documentosRepo.find({
+          where: { solicitud_registro_id: solicitudId, activo: true },
+        });
+
+        const tiposSubidos = new Set(documentosSubidos.map((d) => d.tipo_documento_id));
+        const faltantes = tiposObligatorios.filter((t) => !tiposSubidos.has(t.id));
+
+        if (faltantes.length > 0) {
+          const nombres = faltantes.map((t) => t.nombre).join(', ');
+          throw new BadRequestException(
+            `Faltan documentos obligatorios por subir: ${nombres}.`,
+          );
+        }
+
+        const pendientes = documentosSubidos.filter((d) => d.estado_validacion === 'pendiente');
+        const rechazados = documentosSubidos.filter((d) => d.estado_validacion === 'rechazado');
+
+        if (pendientes.length > 0) {
+          throw new BadRequestException(
+            `No se puede aprobar. Hay ${pendientes.length} documento(s) pendiente(s) de validación.`,
+          );
+        }
+
+        if (rechazados.length > 0) {
+          throw new BadRequestException(
+            `No se puede aprobar. Hay ${rechazados.length} documento(s) rechazado(s). El usuario debe corregirlos.`,
+          );
+        }
+      }
+    }
+
+    // Validaciones pasadas — ahora sí se guarda el nuevo estado
     solicitud.estado_solicitud = nuevoEstado;
     solicitud.admin_revisor_id = adminId;
     solicitud.observaciones_admin = observaciones;
@@ -126,44 +176,6 @@ export class RegistroService {
     }
 
     await this.solicitudesRepo.save(solicitud);
-
-    // Si es persona jurídica, verifica que todos los documentos estén aprobados antes de activar
-    if (nuevoEstado === 'aprobado') {
-      const usuario = await this.usuariosRepo.findOne({
-        where: { id: solicitud.usuario_id },
-        relations: ['tipo_perfil'],
-      });
-
-      if (usuario?.tipo_persona === 'juridica') {
-        const documentosPendientes = await this.documentosRepo.count({
-          where: {
-            solicitud_registro_id: solicitudId,
-            estado_validacion: 'pendiente',
-            activo: true,
-          },
-        });
-
-        const documentosRechazados = await this.documentosRepo.count({
-          where: {
-            solicitud_registro_id: solicitudId,
-            estado_validacion: 'rechazado',
-            activo: true,
-          },
-        });
-
-        if (documentosPendientes > 0) {
-          throw new BadRequestException(
-            `No se puede aprobar la solicitud. Hay ${documentosPendientes} documento(s) pendiente(s) de validación.`,
-          );
-        }
-
-        if (documentosRechazados > 0) {
-          throw new BadRequestException(
-            `No se puede aprobar la solicitud. Hay ${documentosRechazados} documento(s) rechazado(s). El usuario debe corregirlos.`,
-          );
-        }
-      }
-    }
 
     // Si se aprueba, activa la cuenta y asigna el rol según el tipo de perfil
     if (nuevoEstado === 'aprobado') {
@@ -200,9 +212,11 @@ export class RegistroService {
         }
       }
 
-      // Auto-crea el perfil de productora con los datos ya ingresados
+      // Auto-crea el perfil según el tipo de perfil del usuario
       if (usuario?.tipo_perfil?.codigo === 'productora') {
         await this.autoCrearPerfilProductora(solicitud.usuario_id, usuario.tipo_persona);
+      } else if (usuario?.tipo_perfil?.codigo === 'proveedor') {
+        await this.autoCrearPerfilProveedor(solicitud.usuario_id);
       }
     }
 
@@ -249,6 +263,18 @@ export class RegistroService {
 
     await this.perfilesProductoraRepo.save(
       this.perfilesProductoraRepo.create({ usuario_id: usuarioId, ...datos }),
+    );
+  }
+
+  // Crea automáticamente el perfil de proveedor al aprobar la cuenta con verificado = true
+  private async autoCrearPerfilProveedor(usuarioId: number) {
+    const existe = await this.perfilesProveedorRepo.findOne({ where: { usuario_id: usuarioId } });
+    if (existe) {
+      await this.perfilesProveedorRepo.update(existe.id, { verificado: true });
+      return;
+    }
+    await this.perfilesProveedorRepo.save(
+      this.perfilesProveedorRepo.create({ usuario_id: usuarioId, verificado: true, visible_directorio: true }),
     );
   }
 

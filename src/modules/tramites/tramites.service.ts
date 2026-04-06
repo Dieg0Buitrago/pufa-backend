@@ -2,7 +2,7 @@ import {
   Injectable, NotFoundException, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Tramite } from './entities/tramite.entity';
 import { TramiteLocacion } from './entities/tramite-locacion.entity';
@@ -20,6 +20,7 @@ export class TramitesService {
     @InjectRepository(HistorialTramite) private historialRepo: Repository<HistorialTramite>,
     @InjectRepository(EstadoTramite) private estadosTramiteRepo: Repository<EstadoTramite>,
     private configService: ConfigService,
+    private dataSource: DataSource,
   ) {}
 
   // Lista trámites con paginación — admin ve todos, solicitante solo los suyos
@@ -67,7 +68,7 @@ export class TramitesService {
     return tramite;
   }
 
-  // Crea un nuevo trámite y genera número de radicado único
+  // Crea un nuevo trámite y genera número de radicado único — todo en una sola transacción
   async crear(usuarioId: number, dto: CrearTramiteDto) {
     if (!dto.compromiso_etico_aceptado || !dto.manejo_residuos_aceptado) {
       throw new BadRequestException('Debe aceptar todos los compromisos éticos obligatorios');
@@ -80,55 +81,57 @@ export class TramitesService {
     const numeroRadicado = this.generarNumeroRadicado();
     const porcentajeAbono = this.configService.get<number>('app.porcentajeAbonoDefault', 30);
 
-    const tramite = this.tramitesRepo.create({
-      proyecto_id: dto.proyecto_id,
-      usuario_solicitante_id: usuarioId,
-      tipo_tramite_id: dto.tipo_tramite_id,
-      estado_tramite_id: estadoInicial?.id,
-      numero_radicado: numeroRadicado,
-      requiere_seguro_rc: dto.requiere_seguro_rc ?? false,
-      requiere_aval_institucional: dto.requiere_aval_institucional ?? false,
-      usa_drones: dto.usa_drones ?? false,
-      requiere_permiso_aeronautica: dto.usa_drones ?? false,
-      requiere_cierre_vias: dto.requiere_cierre_vias ?? false,
-      requiere_plan_manejo_transito: dto.requiere_cierre_vias ?? false,
-      compromiso_etico_aceptado: dto.compromiso_etico_aceptado,
-      manejo_residuos_aceptado: dto.manejo_residuos_aceptado,
-      consentimiento_comunidades_aplica: dto.consentimiento_comunidades_aplica ?? false,
-      observaciones_generales: dto.observaciones_generales,
-      porcentaje_abono: porcentajeAbono,
+    return this.dataSource.transaction(async (manager) => {
+      const tramite = manager.create(Tramite, {
+        proyecto_id: dto.proyecto_id,
+        usuario_solicitante_id: usuarioId,
+        tipo_tramite_id: dto.tipo_tramite_id,
+        estado_tramite_id: estadoInicial?.id,
+        numero_radicado: numeroRadicado,
+        requiere_seguro_rc: dto.requiere_seguro_rc ?? false,
+        requiere_aval_institucional: dto.requiere_aval_institucional ?? false,
+        usa_drones: dto.usa_drones ?? false,
+        requiere_permiso_aeronautica: dto.usa_drones ?? false,
+        requiere_cierre_vias: dto.requiere_cierre_vias ?? false,
+        requiere_plan_manejo_transito: dto.requiere_cierre_vias ?? false,
+        compromiso_etico_aceptado: dto.compromiso_etico_aceptado,
+        manejo_residuos_aceptado: dto.manejo_residuos_aceptado,
+        consentimiento_comunidades_aplica: dto.consentimiento_comunidades_aplica ?? false,
+        observaciones_generales: dto.observaciones_generales,
+        porcentaje_abono: porcentajeAbono,
+      });
+
+      const tramiteGuardado = await manager.save(Tramite, tramite);
+
+      // Guarda las locaciones del trámite
+      if (dto.locaciones?.length) {
+        const locaciones = dto.locaciones.map((l) =>
+          manager.create(TramiteLocacion, { tramite_id: tramiteGuardado.id, ...l }),
+        );
+        await manager.save(TramiteLocacion, locaciones);
+      }
+
+      // Guarda el equipo técnico del trámite
+      if (dto.equipo_tecnico?.length) {
+        const equipo = dto.equipo_tecnico.map((e) =>
+          manager.create(TramiteEquipoTecnico, { tramite_id: tramiteGuardado.id, ...e }),
+        );
+        await manager.save(TramiteEquipoTecnico, equipo);
+      }
+
+      // Registra el evento de creación en el historial
+      await manager.save(
+        manager.create(HistorialTramite, {
+          tramite_id: tramiteGuardado.id,
+          estado_nuevo_id: estadoInicial?.id,
+          usuario_actor_id: usuarioId,
+          accion: 'CREACION_TRAMITE',
+          observacion: `Trámite creado con radicado ${numeroRadicado}`,
+        }),
+      );
+
+      return tramiteGuardado;
     });
-
-    const tramiteGuardado = await this.tramitesRepo.save(tramite);
-
-    // Guarda las locaciones del trámite
-    if (dto.locaciones?.length) {
-      const locaciones = dto.locaciones.map((l) =>
-        this.locacionesRepo.create({ tramite_id: tramiteGuardado.id, ...l }),
-      );
-      await this.locacionesRepo.save(locaciones);
-    }
-
-    // Guarda el equipo técnico del trámite
-    if (dto.equipo_tecnico?.length) {
-      const equipo = dto.equipo_tecnico.map((e) =>
-        this.equipoRepo.create({ tramite_id: tramiteGuardado.id, ...e }),
-      );
-      await this.equipoRepo.save(equipo);
-    }
-
-    // Registra el evento de creación en el historial
-    await this.historialRepo.save(
-      this.historialRepo.create({
-        tramite_id: tramiteGuardado.id,
-        estado_nuevo_id: estadoInicial?.id,
-        usuario_actor_id: usuarioId,
-        accion: 'CREACION_TRAMITE',
-        observacion: `Trámite creado con radicado ${numeroRadicado}`,
-      }),
-    );
-
-    return tramiteGuardado;
   }
 
   // Cambia el estado de un trámite (admin/revisor)

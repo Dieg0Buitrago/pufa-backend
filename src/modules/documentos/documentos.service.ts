@@ -1,17 +1,27 @@
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { Documento } from './entities/documento.entity';
+import { TipoDocumento } from '../catalogos/entities/tipo-documento.entity';
+import { Tramite } from '../tramites/entities/tramite.entity';
+
+// Fragmentos de nombre para identificar tipos de documento especiales del trámite
+const TIPO_PLAN_CONTINGENCIA = 'contingencia';
+const TIPO_CONSENTIMIENTO_COMUNIDADES = 'consentimiento';
 
 @Injectable()
 export class DocumentosService {
   constructor(
     @InjectRepository(Documento)
     private documentosRepo: Repository<Documento>,
+    @InjectRepository(TipoDocumento)
+    private tiposDocumentoRepo: Repository<TipoDocumento>,
+    @InjectRepository(Tramite)
+    private tramitesRepo: Repository<Tramite>,
   ) {}
 
   // Registra un archivo subido con su hash SHA256
@@ -51,7 +61,79 @@ export class DocumentosService {
       estado_validacion: 'pendiente',
     });
 
-    return this.documentosRepo.save(documento);
+    const documentoGuardado = await this.documentosRepo.save(documento);
+
+    // Si el documento pertenece a un trámite, actualiza los flags correspondientes
+    if (tramiteId && tipoDocumentoId) {
+      await this.actualizarFlagsTramite(tramiteId, tipoDocumentoId);
+    }
+
+    return documentoGuardado;
+  }
+
+  // Actualiza plan_contingencia_entregado o consentimiento_comunidades_entregado según el tipo de documento
+  private async actualizarFlagsTramite(tramiteId: number, tipoDocumentoId: number) {
+    const tipo = await this.tiposDocumentoRepo.findOne({ where: { id: tipoDocumentoId } });
+    if (!tipo) return;
+
+    const nombre = tipo.nombre.toLowerCase();
+    const actualizacion: Partial<Tramite> = {};
+
+    if (nombre.includes(TIPO_PLAN_CONTINGENCIA)) {
+      actualizacion.plan_contingencia_entregado = true;
+    } else if (nombre.includes(TIPO_CONSENTIMIENTO_COMUNIDADES)) {
+      actualizacion.consentimiento_comunidades_entregado = true;
+    }
+
+    if (Object.keys(actualizacion).length > 0) {
+      await this.tramitesRepo.update(tramiteId, actualizacion);
+    }
+  }
+
+  // Registra los 4 documentos obligatorios de una persona jurídica en una sola llamada
+  async registrarDocumentosJuridica(
+    usuarioId: number,
+    archivos: {
+      certificado_existencia?: Express.Multer.File[];
+      acta_constitucion?: Express.Multer.File[];
+      rut?: Express.Multer.File[];
+      acta_nombramiento?: Express.Multer.File[];
+    },
+    solicitudRegistroId: number,
+  ) {
+    // Resuelve los IDs de tipos de documento por nombre usando ILIKE para evitar problemas con acentos
+    const buscarTipo = async (fragmento: string) => {
+      const result = await this.tiposDocumentoRepo
+        .createQueryBuilder('t')
+        .where('t.nombre ILIKE :fragmento', { fragmento: `%${fragmento}%` })
+        .andWhere('t.activo = true')
+        .getOne();
+      return result?.id;
+    };
+
+    const campos = [
+      { campo: 'certificado_existencia' as const, tipoId: await buscarTipo('mara de comercio') },
+      { campo: 'acta_constitucion'      as const, tipoId: await buscarTipo('constituci') },
+      { campo: 'rut'                    as const, tipoId: await buscarTipo('RUT') },
+      { campo: 'acta_nombramiento'      as const, tipoId: await buscarTipo('nombramiento') },
+    ];
+
+    const resultados = await Promise.all(
+      campos.map(async ({ campo, tipoId }) => {
+        const archivo = archivos[campo]?.[0];
+        if (!archivo) return null;
+        // Desactiva versiones anteriores del mismo tipo para esta solicitud
+        if (tipoId) {
+          await this.documentosRepo.update(
+            { solicitud_registro_id: solicitudRegistroId, tipo_documento_id: tipoId, activo: true },
+            { activo: false },
+          );
+        }
+        return this.registrarDocumento(usuarioId, archivo, tipoId, undefined, solicitudRegistroId);
+      }),
+    );
+
+    return resultados.filter(Boolean);
   }
 
   // Lista documentos de un trámite

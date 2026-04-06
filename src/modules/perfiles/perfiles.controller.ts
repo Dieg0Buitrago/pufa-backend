@@ -1,10 +1,10 @@
 import {
-  Controller, Get, Post, Patch, Param, Body,
+  Controller, Get, Patch, Body,
   Query, ParseIntPipe, UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
-  ApiParam, ApiQuery,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { PerfilesService } from './perfiles.service';
 import { GuardarPerfilProveedorDto } from './dto/guardar-perfil-proveedor.dto';
@@ -75,26 +75,4 @@ export class PerfilesController {
     return this.perfilesService.guardarPerfilProductora(usuarioId, datos);
   }
 
-  @ApiBearerAuth('JWT')
-  @Roles('admin')
-  @Get('proveedores/pendientes')
-  @ApiOperation({ summary: 'Proveedores pendientes de verificación', description: 'Lista perfiles proveedor con verificado = false. Solo admin.' })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 20 })
-  proveedoresPendientes(
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
-  ) {
-    return this.perfilesService.listarProveedoresPendientes(page, limit);
-  }
-
-  @ApiBearerAuth('JWT')
-  @Roles('admin')
-  @Patch('proveedores/:id/verificar')
-  @ApiOperation({ summary: 'Verificar proveedor', description: 'Admin marca un proveedor como verificado, habilitándolo en el directorio público.' })
-  @ApiParam({ name: 'id', description: 'ID del perfil de proveedor' })
-  @ApiResponse({ status: 200, description: 'Proveedor verificado.' })
-  verificar(@Param('id', ParseIntPipe) id: number) {
-    return this.perfilesService.verificarProveedor(id);
-  }
 }

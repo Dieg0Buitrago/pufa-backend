@@ -1,6 +1,6 @@
 import {
   IsString, IsOptional, IsNumber, IsBoolean,
-  IsDateString, Min, Max,
+  IsDateString, Min, Max, IsArray, IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -127,10 +127,25 @@ export class CrearPersonaNaturalDto {
   @IsNumber()
   gama_equipos_id?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID del rango de experiencia en el sector (ver /catalogos/rangos-experiencia-sector)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID del rango de experiencia en el sector cultural en general (ver /catalogos/rangos-experiencia-sector)' })
   @IsOptional()
   @IsNumber()
   tiempo_experiencia_sector_id?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del rango de experiencia en el sector cultural en Boyacá (ver /catalogos/rangos-experiencia-sector)' })
+  @IsOptional()
+  @IsNumber()
+  tiempo_experiencia_boyaca_id?: number;
+
+  @ApiPropertyOptional({
+    example: ['Municipal', 'Departamental'],
+    description: 'Tipos de convocatoria a los que se presenta (Municipal, Departamental, Nacional, Internacional)',
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(['Municipal', 'Departamental', 'Nacional', 'Internacional'], { each: true })
+  tipos_convocatoria?: string[];
 
   @ApiPropertyOptional({ example: 1, description: 'ID del tipo de producción en que participa (ver /catalogos/tipos-produccion-participa)' })
   @IsOptional()

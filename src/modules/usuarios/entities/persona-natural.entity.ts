@@ -105,7 +105,14 @@ export class PersonaNatural {
   tiempo_experiencia_sector_id: number;
 
   @Column({ nullable: true })
+  tiempo_experiencia_boyaca_id: number;
+
+  @Column({ nullable: true })
   produccion_participa_id: number;
+
+  // Tipos de convocatoria a las que se suele presentar (selección múltiple)
+  @Column({ type: 'simple-array', nullable: true })
+  tipos_convocatoria: string[];
 
   // Nivel de inglés del 0 al 5 en cada habilidad
   @Column({ type: 'smallint', default: 0 })
@@ -174,6 +181,10 @@ export class PersonaNatural {
   @ManyToOne(() => RangoExperienciaSector)
   @JoinColumn({ name: 'tiempo_experiencia_sector_id' })
   tiempo_experiencia_sector: RangoExperienciaSector;
+
+  @ManyToOne(() => RangoExperienciaSector)
+  @JoinColumn({ name: 'tiempo_experiencia_boyaca_id' })
+  tiempo_experiencia_boyaca: RangoExperienciaSector;
 
   @ManyToOne(() => TipoProduccionParticipa)
   @JoinColumn({ name: 'produccion_participa_id' })

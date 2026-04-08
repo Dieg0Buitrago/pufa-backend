@@ -1,8 +1,8 @@
 import {
   Controller, Get, Post, Patch, Param, Body,
-  ParseIntPipe, UseGuards, UseInterceptors, UploadedFile,
+  ParseIntPipe, UseGuards, UseInterceptors, UploadedFile, UploadedFiles,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, AnyFilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import {
@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('documentos')
 @ApiBearerAuth('JWT')
@@ -65,6 +66,48 @@ export class DocumentosController {
     );
   }
 
+  @Public()
+  @Post('subir-registro')
+  @ApiOperation({
+    summary: 'Subir documentos de registro',
+    description: 'Público — no requiere autenticación. Sube todos los documentos de una solicitud de registro en un solo request. Campos aceptados: certificado_existencia, acta_constitucion, rut, acta_nombramiento, documento_identidad. Máximo 10 MB por archivo.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        solicitud_registro_id: { type: 'number', example: 41, description: 'ID de la solicitud recibido al registrarse' },
+        certificado_existencia: { type: 'string', format: 'binary' },
+        acta_constitucion: { type: 'string', format: 'binary' },
+        rut: { type: 'string', format: 'binary' },
+        acta_nombramiento: { type: 'string', format: 'binary' },
+        documento_identidad: { type: 'string', format: 'binary' },
+      },
+      required: ['solicitud_registro_id'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Documentos subidos y asociados a la solicitud de registro.' })
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const nombre = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
+          cb(null, nombre);
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  subirDocumentosRegistro(
+    @UploadedFiles() archivos: Express.Multer.File[],
+    @Body('solicitud_registro_id', ParseIntPipe) solicitudRegistroId: number,
+  ) {
+    const archivosConCampo = archivos.map((file) => ({ campo: file.fieldname, file }));
+    return this.documentosService.registrarDocumentosRegistro(solicitudRegistroId, archivosConCampo);
+  }
+
   @Get('tramite/:tramiteId')
   @ApiOperation({ summary: 'Listar documentos de un trámite' })
   @ApiParam({ name: 'tramiteId', description: 'ID del trámite' })
@@ -80,8 +123,8 @@ export class DocumentosController {
   @ApiBody({
     schema: {
       properties: {
-        estado: { type: 'string', enum: ['aprobado', 'rechazado'], example: 'aprobado' },
-        observaciones: { type: 'string', example: 'Documento legible y vigente.' },
+        estado_validacion: { type: 'string', enum: ['aprobado', 'rechazado'], example: 'aprobado' },
+        observaciones_validacion: { type: 'string', example: 'Documento legible y vigente.' },
       },
       required: ['estado'],
     },
@@ -90,8 +133,8 @@ export class DocumentosController {
   validar(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') adminId: number,
-    @Body('estado') estado: 'aprobado' | 'rechazado',
-    @Body('observaciones') observaciones?: string,
+    @Body('estado_validacion') estado: 'aprobado' | 'rechazado',
+    @Body('observaciones_validacion') observaciones?: string,
   ) {
     return this.documentosService.validarDocumento(id, adminId, estado, observaciones);
   }

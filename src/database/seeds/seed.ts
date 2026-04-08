@@ -44,7 +44,8 @@ async function seed() {
         ('admin', 'Administrador', 'Personal de la Secretaría de Cultura y Comisión Fílmica de Boyacá', true),
         ('productora', 'Productora', 'Empresa o persona que solicita permisos de rodaje', true),
         ('proveedor', 'Proveedor', 'Prestador de servicios audiovisuales registrado en el directorio', true),
-        ('academico', 'Académico', 'Estudiante o investigador con aval institucional', true)
+        ('academico', 'Académico', 'Estudiante o investigador con aval institucional', true),
+        ('revisor', 'Revisor', 'Personal interno de la Secretaría de Cultura encargado de revisar y aprobar trámites', true)
       ON CONFLICT (codigo) DO NOTHING
     `);
 
@@ -318,19 +319,21 @@ async function seed() {
 
     // --- TIPOS DE DOCUMENTO ---
     await qr.query(`
-      INSERT INTO tipos_documento (nombre, descripcion, aplica_a, obligatorio, activo) VALUES
-        ('Cédula de ciudadanía', 'Documento de identidad del representante o solicitante', 'registro', true, true),
-        ('RUT', 'Registro Único Tributario actualizado', 'registro', true, true),
-        ('Cámara de comercio', 'Certificado de existencia vigente (no mayor a 90 días)', 'registro', false, true),
-        ('Carta de intención del proyecto', 'Descripción detallada del proyecto de rodaje', 'tramite', true, true),
-        ('Plan de contingencia', 'Plan para el manejo de emergencias durante el rodaje', 'tramite', true, true),
-        ('Soporte de pago', 'Comprobante del pago o abono realizado', 'pago', true, true),
-        ('Permiso de Aeronáutica Civil', 'Autorización UAEAC para el uso de drones', 'tramite', false, true),
-        ('Plan de manejo de tránsito', 'Plan aprobado por la autoridad de tránsito competente', 'tramite', false, true),
-        ('Consentimiento de comunidades', 'Acta de consentimiento libre, previo e informado de comunidades étnicas', 'tramite', false, true),
-        ('Póliza de responsabilidad civil', 'Seguro de RC vigente para la producción', 'tramite', false, true),
-        ('Aval institucional', 'Carta de aval de la institución educativa (para trámites académicos)', 'tramite', false, true)
-      ON CONFLICT DO NOTHING
+      INSERT INTO tipos_documento (codigo, nombre, descripcion, aplica_a, obligatorio, activo) VALUES
+        ('documento_identidad',      'Cédula de ciudadanía',         'Documento de identidad del representante o solicitante',         'registro', true,  true),
+        ('rut',                      'RUT',                          'Registro Único Tributario actualizado',                          'registro', true,  true),
+        ('certificado_existencia',   'Cámara de comercio',           'Certificado de existencia vigente (no mayor a 90 días)',          'registro', false, true),
+        ('acta_constitucion',        'Acta de constitución',         'Documento de constitución de la empresa o entidad',              'registro', false, true),
+        ('acta_nombramiento',        'Acta de nombramiento',         'Acta de nombramiento del representante legal vigente',           'registro', false, true),
+        ('carta_intencion',          'Carta de intención del proyecto', 'Descripción detallada del proyecto de rodaje',               'tramite',  true,  true),
+        ('plan_contingencia',        'Plan de contingencia',         'Plan para el manejo de emergencias durante el rodaje',           'tramite',  true,  true),
+        ('soporte_pago',             'Soporte de pago',              'Comprobante del pago o abono realizado',                         'pago',     true,  true),
+        ('permiso_aeronautica',      'Permiso de Aeronáutica Civil', 'Autorización UAEAC para el uso de drones',                      'tramite',  false, true),
+        ('plan_transito',            'Plan de manejo de tránsito',   'Plan aprobado por la autoridad de tránsito competente',          'tramite',  false, true),
+        ('consentimiento_comunidades','Consentimiento de comunidades','Acta de consentimiento libre, previo e informado de comunidades étnicas', 'tramite', false, true),
+        ('poliza_rc',                'Póliza de responsabilidad civil','Seguro de RC vigente para la producción',                     'tramite',  false, true),
+        ('aval_institucional',       'Aval institucional',           'Carta de aval de la institución educativa (para trámites académicos)', 'tramite', false, true)
+      ON CONFLICT (codigo) DO NOTHING
     `);
 
     // --- TIPOS DE CONVOCATORIA ---

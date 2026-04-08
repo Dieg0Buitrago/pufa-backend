@@ -1,4 +1,5 @@
-import { IsEmail, IsString, MinLength, IsIn, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsIn, IsOptional, IsInt, IsPositive } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegistroUsuarioDto {
@@ -14,6 +15,12 @@ export class RegistroUsuarioDto {
   @ApiProperty({ enum: ['natural', 'juridica'], example: 'natural', description: 'Tipo de persona del usuario' })
   @IsIn(['natural', 'juridica'], { message: 'El tipo de persona debe ser natural o juridica' })
   tipo_persona: 'natural' | 'juridica';
+
+  @ApiProperty({ example: 2, description: 'ID del tipo de perfil (ver /api/v1/catalogos/tipos-perfil): productora, proveedor, académico, etc.' })
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  tipo_perfil_id: number;
 
   @ApiPropertyOptional({ example: '3101234567', description: 'Número de teléfono de contacto' })
   @IsOptional()

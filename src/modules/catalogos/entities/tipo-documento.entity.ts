@@ -5,6 +5,9 @@ export class TipoDocumento {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ length: 50, unique: true, nullable: true })
+  codigo: string;
+
   @Column({ length: 150 })
   nombre: string;
 

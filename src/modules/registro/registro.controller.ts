@@ -7,10 +7,12 @@ import {
   ApiParam, ApiQuery, ApiBody,
 } from '@nestjs/swagger';
 import { RegistroService } from './registro.service';
+import { SubsanarRegistroDto } from './dto/subsanar-registro.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('registro')
 @ApiBearerAuth('JWT')
@@ -28,6 +30,24 @@ export class RegistroController {
   @ApiResponse({ status: 400, description: 'Ya existe una solicitud pendiente.' })
   crearSolicitud(@CurrentUser('id') usuarioId: number) {
     return this.registroService.crearSolicitud(usuarioId);
+  }
+
+  @Public()
+  @Patch('solicitudes/:id/subsanar')
+  @ApiOperation({
+    summary: 'Corregir y reenviar solicitud en subsanación',
+    description: 'Público — no requiere autenticación. El usuario usa el solicitud_id recibido al registrarse. Solo funciona si la solicitud está en estado subsanacion. Enviar únicamente los campos que necesitan corrección.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud recibido al registrarse' })
+  @ApiBody({ type: SubsanarRegistroDto })
+  @ApiResponse({ status: 200, description: 'Datos corregidos enviados. Solicitud vuelve a estado pendiente.' })
+  @ApiResponse({ status: 403, description: 'La solicitud no está en estado de subsanación.' })
+  @ApiResponse({ status: 404, description: 'No se encontró la solicitud.' })
+  subsanar(
+    @Param('id', ParseIntPipe) solicitudId: number,
+    @Body() dto: SubsanarRegistroDto,
+  ) {
+    return this.registroService.subsanarSolicitud(solicitudId, dto);
   }
 
   @Roles('admin')

@@ -1,24 +1,28 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { SolicitudRegistro } from './entities/solicitud-registro.entity';
 import { HistorialSolicitudRegistro } from './entities/historial-solicitud-registro.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { EstadoCuenta } from '../catalogos/entities/estado-cuenta.entity';
 import { Rol } from '../auth/entities/rol.entity';
 import { UsuarioRol } from '../auth/entities/usuario-rol.entity';
+import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
 import { PersonaNatural } from '../usuarios/entities/persona-natural.entity';
 import { PersonaJuridica } from '../usuarios/entities/persona-juridica.entity';
+import { SubsanarRegistroDto } from './dto/subsanar-registro.dto';
 import { PerfilProductora } from '../perfiles/entities/perfil-productora.entity';
 import { PerfilProveedor } from '../perfiles/entities/perfil-proveedor.entity';
-import { Documento } from '../documentos/entities/documento.entity';
-import { TipoDocumento } from '../catalogos/entities/tipo-documento.entity';
+import { PerfilAcademico } from '../perfiles/entities/perfil-academico.entity';
+import { SubcategoriaProveedor } from '../perfiles/entities/subcategoria-proveedor.entity';
+import { EspecialidadProveedor } from '../perfiles/entities/especialidad-proveedor.entity';
 
-// Mapeo de tipo de perfil al código de rol correspondiente
-const PERFIL_ROL_MAP: Record<string, string> = {
+// Mapeo entre código de tipo de perfil y código de rol a asignar
+const ROL_POR_PERFIL: Record<string, string> = {
   productora: 'productora',
   proveedor: 'proveedor',
   academico: 'academico',
+  admin: 'admin',
   revisor: 'revisor',
 };
 
@@ -37,6 +41,8 @@ export class RegistroService {
     private rolesRepo: Repository<Rol>,
     @InjectRepository(UsuarioRol)
     private usuarioRolesRepo: Repository<UsuarioRol>,
+    @InjectRepository(TipoPerfil)
+    private tiposPerfilRepo: Repository<TipoPerfil>,
     @InjectRepository(PersonaNatural)
     private personasNaturalesRepo: Repository<PersonaNatural>,
     @InjectRepository(PersonaJuridica)
@@ -45,10 +51,12 @@ export class RegistroService {
     private perfilesProductoraRepo: Repository<PerfilProductora>,
     @InjectRepository(PerfilProveedor)
     private perfilesProveedorRepo: Repository<PerfilProveedor>,
-    @InjectRepository(Documento)
-    private documentosRepo: Repository<Documento>,
-    @InjectRepository(TipoDocumento)
-    private tiposDocumentoRepo: Repository<TipoDocumento>,
+    @InjectRepository(PerfilAcademico)
+    private perfilesAcademicoRepo: Repository<PerfilAcademico>,
+    @InjectRepository(SubcategoriaProveedor)
+    private subcategoriasRepo: Repository<SubcategoriaProveedor>,
+    @InjectRepository(EspecialidadProveedor)
+    private especialidadesRepo: Repository<EspecialidadProveedor>,
   ) {}
 
   // Crea o reactiva la solicitud de registro para el usuario autenticado
@@ -179,7 +187,14 @@ export class RegistroService {
 
     // Si se aprueba, activa la cuenta y asigna el rol según el tipo de perfil
     if (nuevoEstado === 'aprobado') {
-      const estadoActivo = await this.estadosCuentaRepo.findOne({ where: { codigo: 'activo' } });
+      const [estadoActivo, usuario] = await Promise.all([
+        this.estadosCuentaRepo.findOne({ where: { codigo: 'activo' } }),
+        this.usuariosRepo.findOne({
+          where: { id: solicitud.usuario_id },
+          relations: ['tipo_perfil'],
+        }),
+      ]);
+
       if (estadoActivo) {
         await this.usuariosRepo.update(solicitud.usuario_id, {
           estado_cuenta_id: estadoActivo.id,
@@ -188,35 +203,29 @@ export class RegistroService {
       }
 
       // Asigna el rol correspondiente al tipo de perfil del usuario
-      const usuario = await this.usuariosRepo.findOne({
-        where: { id: solicitud.usuario_id },
-        relations: ['tipo_perfil'],
-      });
-      const codigoRol = PERFIL_ROL_MAP[usuario?.tipo_perfil?.codigo ?? ''];
-      if (codigoRol) {
-        const rol = await this.rolesRepo.findOne({ where: { codigo: codigoRol, activo: true } });
-        if (rol) {
-          const yaAsignado = await this.usuarioRolesRepo.findOne({
-            where: { usuario_id: solicitud.usuario_id, rol_id: rol.id },
-          });
-          if (!yaAsignado) {
-            await this.usuarioRolesRepo.save(
-              this.usuarioRolesRepo.create({
-                usuario_id: solicitud.usuario_id,
-                rol_id: rol.id,
-                asignado_por: adminId,
-                activo: true,
-              }),
-            );
+      if (usuario?.tipo_perfil) {
+        const codigoRol = ROL_POR_PERFIL[usuario.tipo_perfil.codigo];
+        if (codigoRol) {
+          const rol = await this.rolesRepo.findOne({ where: { codigo: codigoRol, activo: true } });
+          if (rol) {
+            const yaAsignado = await this.usuarioRolesRepo.findOne({
+              where: { usuario_id: solicitud.usuario_id, rol_id: rol.id },
+            });
+            if (!yaAsignado) {
+              await this.usuarioRolesRepo.save(
+                this.usuarioRolesRepo.create({
+                  usuario_id: solicitud.usuario_id,
+                  rol_id: rol.id,
+                  asignado_por: adminId,
+                  activo: true,
+                }),
+              );
+            }
           }
         }
-      }
 
-      // Auto-crea el perfil según el tipo de perfil del usuario
-      if (usuario?.tipo_perfil?.codigo === 'productora') {
-        await this.autoCrearPerfilProductora(solicitud.usuario_id, usuario.tipo_persona);
-      } else if (usuario?.tipo_perfil?.codigo === 'proveedor') {
-        await this.autoCrearPerfilProveedor(solicitud.usuario_id);
+        // Pobla el perfil público con los datos de la persona al aprobar
+        await this.poblarPerfilAlAprobar(solicitud.usuario_id, usuario.tipo_persona, usuario.tipo_perfil.codigo);
       }
     }
 
@@ -228,54 +237,121 @@ export class RegistroService {
     return { mensaje: `Solicitud actualizada a estado: ${nuevoEstado}` };
   }
 
-  // Crea automáticamente el perfil de productora al aprobar la cuenta
-  private async autoCrearPerfilProductora(usuarioId: number, tipoPersona: string) {
-    const existe = await this.perfilesProductoraRepo.findOne({ where: { usuario_id: usuarioId } });
-    if (existe) return;
+  // El usuario corrige sus datos y reenvía la solicitud que está en subsanación (sin login)
+  async subsanarSolicitud(solicitudId: number, dto: SubsanarRegistroDto) {
+    const solicitud = await this.solicitudesRepo.findOne({
+      where: { id: solicitudId },
+    });
 
-    let datos: Partial<PerfilProductora> = {};
+    if (!solicitud) {
+      throw new NotFoundException('No se encontró la solicitud de registro');
+    }
+    if (solicitud.estado_solicitud !== 'subsanacion') {
+      throw new ForbiddenException(
+        `La solicitud no está en estado de subsanación. Estado actual: ${solicitud.estado_solicitud}`,
+      );
+    }
+
+    // Actualiza los datos de la persona según lo que envíe el usuario
+    if (dto.perfil_natural) {
+      const persona = await this.personasNaturalesRepo.findOne({ where: { usuario_id: solicitud.usuario_id } });
+      if (persona) {
+        await this.personasNaturalesRepo.update(persona.id, dto.perfil_natural as any);
+      }
+    }
+
+    if (dto.perfil_juridica) {
+      const persona = await this.personasJuridicasRepo.findOne({ where: { usuario_id: solicitud.usuario_id } });
+      if (persona) {
+        await this.personasJuridicasRepo.update(persona.id, dto.perfil_juridica as any);
+      }
+    }
+
+    if (dto.perfil_academico) {
+      const perfil = await this.perfilesAcademicoRepo.findOne({ where: { usuario_id: solicitud.usuario_id } });
+      if (perfil) {
+        await this.perfilesAcademicoRepo.update(perfil.id, dto.perfil_academico as any);
+      }
+    }
+
+    if (dto.perfil_proveedor) {
+      const perfil = await this.perfilesProveedorRepo.findOne({
+        where: { usuario_id: solicitud.usuario_id },
+        relations: ['subcategorias', 'especialidades'],
+      });
+      if (perfil) {
+        const { subcategoria_ids, especialidad_ids, ...camposBasicos } = dto.perfil_proveedor;
+        Object.assign(perfil, camposBasicos);
+
+        if (subcategoria_ids?.length) {
+          perfil.subcategorias = await this.subcategoriasRepo.find({ where: { id: In(subcategoria_ids) } });
+        }
+        if (especialidad_ids?.length) {
+          perfil.especialidades = await this.especialidadesRepo.find({ where: { id: In(especialidad_ids) } });
+        }
+
+        await this.perfilesProveedorRepo.save(perfil);
+      }
+    }
+
+    // Regresa la solicitud a estado pendiente para revisión del admin
+    const estadoAnterior = solicitud.estado_solicitud;
+    solicitud.estado_solicitud = 'pendiente';
+    solicitud.fecha_respuesta = null;
+    await this.solicitudesRepo.save(solicitud);
+
+    await this.registrarHistorial(
+      solicitud.id,
+      estadoAnterior,
+      'pendiente',
+      solicitud.usuario_id,
+      'REENVIO_SUBSANACION',
+      'Usuario corrigió los datos y reenvió la solicitud',
+    );
+
+    return { mensaje: 'Datos corregidos enviados. Su solicitud está nuevamente en revisión.' };
+  }
+
+  // Puebla el perfil público con los datos básicos de la persona al ser aprobada
+  private async poblarPerfilAlAprobar(usuarioId: number, tipoPersona: string, codigoPerfil: string) {
+    let nombrePublico = '';
+    let sitioWeb: string | undefined;
+    let descripcion: string | undefined;
 
     if (tipoPersona === 'natural') {
       const persona = await this.personasNaturalesRepo.findOne({ where: { usuario_id: usuarioId } });
       if (persona) {
-        const partes = [persona.primer_nombre, persona.segundo_nombre, persona.primer_apellido, persona.segundo_apellido];
-        datos = {
-          primer_nombre: persona.primer_nombre,
-          segundo_nombre: persona.segundo_nombre,
-          primer_apellido: persona.primer_apellido,
-          segundo_apellido: persona.segundo_apellido,
-          tipo_identificacion_id: persona.tipo_identificacion_id,
-          numero_documento: persona.numero_documento,
-          municipio_id: persona.municipio_residencia_id,
-          nombre_publico: partes.filter(Boolean).join(' '),
-        };
+        nombrePublico = [persona.primer_nombre, persona.segundo_nombre, persona.primer_apellido, persona.segundo_apellido]
+          .filter(Boolean).join(' ');
       }
-    } else if (tipoPersona === 'juridica') {
+    } else {
       const persona = await this.personasJuridicasRepo.findOne({ where: { usuario_id: usuarioId } });
       if (persona) {
-        datos = {
-          nombre_publico: persona.razon_social,
-          descripcion_empresa: persona.objeto_social,
-          sitio_web: persona.pagina_web,
-        };
+        nombrePublico = persona.razon_social;
+        sitioWeb = persona.pagina_web ?? undefined;
+        descripcion = persona.objeto_social ?? undefined;
       }
     }
 
-    await this.perfilesProductoraRepo.save(
-      this.perfilesProductoraRepo.create({ usuario_id: usuarioId, ...datos }),
-    );
-  }
-
-  // Crea automáticamente el perfil de proveedor al aprobar la cuenta con verificado = true
-  private async autoCrearPerfilProveedor(usuarioId: number) {
-    const existe = await this.perfilesProveedorRepo.findOne({ where: { usuario_id: usuarioId } });
-    if (existe) {
-      await this.perfilesProveedorRepo.update(existe.id, { verificado: true });
-      return;
+    if (codigoPerfil === 'productora') {
+      const perfil = await this.perfilesProductoraRepo.findOne({ where: { usuario_id: usuarioId } });
+      if (perfil) {
+        await this.perfilesProductoraRepo.update(perfil.id, {
+          nombre_publico: nombrePublico || undefined,
+          ...(sitioWeb && { sitio_web: sitioWeb }),
+          ...(descripcion && { descripcion_empresa: descripcion }),
+        });
+      }
+    } else if (codigoPerfil === 'proveedor') {
+      const perfil = await this.perfilesProveedorRepo.findOne({ where: { usuario_id: usuarioId } });
+      if (perfil) {
+        await this.perfilesProveedorRepo.update(perfil.id, {
+          ...(sitioWeb && { sitio_web: sitioWeb }),
+          ...(descripcion && { descripcion_perfil: descripcion }),
+        });
+      }
     }
-    await this.perfilesProveedorRepo.save(
-      this.perfilesProveedorRepo.create({ usuario_id: usuarioId, verificado: true, visible_directorio: true }),
-    );
+    // perfil_academico no tiene campos que mapeen directamente desde persona_natural/juridica
   }
 
   // Registra cada cambio de estado en el historial

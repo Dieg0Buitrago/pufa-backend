@@ -1,7 +1,8 @@
 import {
   IsString, IsOptional, IsNumber, IsBoolean,
-  IsDateString, Min, Max, IsArray, IsIn,
+  IsDateString, Min, Max, IsArray, IsIn, IsInt,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CrearPersonaNaturalDto {
@@ -102,34 +103,40 @@ export class CrearPersonaNaturalDto {
   @IsBoolean()
   migrante_refugiado?: boolean;
 
-  @ApiPropertyOptional({ example: 5, description: 'ID del nivel educativo (ver /catalogos/niveles-educativos)' })
+  @ApiPropertyOptional({ example: 5, description: 'ID del nivel educativo: 1=Primaria, 2=Secundaria, 3=Técnico, 4=Tecnológico, 5=Universitario, 6=Especialización, 7=Maestría, 8=Doctorado' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   nivel_educativo_id?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID del tiempo de dedicación al sector (ver /catalogos/tiempos-dedicacion-sector)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID dedicación al sector: 1=Tiempo completo, 2=Medio tiempo, 3=Por proyectos, 4=Ocasional' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   tiempo_dedicacion_sector_id?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de ingresos del sector (ver /catalogos/tipos-ingresos-sector)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID origen ingresos: 1=Principal fuente, 2=Fuente secundaria, 3=Complemento, 4=Sin ingresos aún' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   ingresos_provienen_sector_id?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de propiedad de equipos (ver /catalogos/tipos-propiedad-equipos)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID propiedad equipos: 1=Propios, 2=Arrendados, 3=Mixto, 4=No tiene equipos propios' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   equipos_propios_tipo_id?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID de la gama de equipos (ver /catalogos/gamas-equipos)' })
+  @ApiPropertyOptional({ example: 2, description: 'ID gama equipos: 1=Básica, 2=Media, 3=Alta, 4=Profesional/cine' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   gama_equipos_id?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID del rango de experiencia en el sector cultural en general (ver /catalogos/rangos-experiencia-sector)' })
+  @ApiPropertyOptional({ example: 2, description: 'ID experiencia en el sector: 1=Menos de 1 año, 2=1 a 3 años, 3=3 a 5 años, 4=5 a 10 años, 5=Más de 10 años' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   tiempo_experiencia_sector_id?: number;
 
   @ApiPropertyOptional({ example: 1, description: 'ID del rango de experiencia en el sector cultural en Boyacá (ver /catalogos/rangos-experiencia-sector)' })
@@ -147,9 +154,10 @@ export class CrearPersonaNaturalDto {
   @IsIn(['Municipal', 'Departamental', 'Nacional', 'Internacional'], { each: true })
   tipos_convocatoria?: string[];
 
-  @ApiPropertyOptional({ example: 1, description: 'ID del tipo de producción en que participa (ver /catalogos/tipos-produccion-participa)' })
+  @ApiPropertyOptional({ example: 1, description: 'ID tipo de producción en que participa: 1=Cine, 2=Televisión, 3=Publicidad, 4=Documental, 5=Videoclip, 6=Cortometraje' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   produccion_participa_id?: number;
 
   @ApiPropertyOptional({ example: 3, description: 'Nivel de inglés hablado del 0 (ninguno) al 5 (nativo)' })

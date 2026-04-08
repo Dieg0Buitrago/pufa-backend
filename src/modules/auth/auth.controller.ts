@@ -7,6 +7,7 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegistroUsuarioDto } from './dto/registro-usuario.dto';
+import { RegistroCompletoDto } from './dto/registro-completo.dto';
 import { CambiarPasswordDto } from './dto/cambiar-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
@@ -19,11 +20,15 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Registrar nuevo usuario', description: 'Crea un usuario en estado PENDIENTE. Un administrador debe aprobarlo para que pueda iniciar sesión.' })
-  @ApiResponse({ status: 201, description: 'Usuario registrado. Pendiente de aprobación.' })
+  @ApiOperation({
+    summary: 'Registro completo en un solo paso',
+    description: 'Crea el usuario, su perfil (natural o jurídica) y la solicitud de activación en una sola transacción. El administrador debe aprobar la solicitud para que pueda iniciar sesión.',
+  })
+  @ApiResponse({ status: 201, description: 'Registro exitoso. Solicitud pendiente de aprobación.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o tipo de perfil no existe.' })
   @ApiResponse({ status: 409, description: 'Ya existe un usuario con ese correo.' })
-  registrar(@Body() dto: RegistroUsuarioDto) {
-    return this.authService.registrar(dto);
+  registrarCompleto(@Body() dto: RegistroCompletoDto) {
+    return this.authService.registrarCompleto(dto);
   }
 
   @Public()

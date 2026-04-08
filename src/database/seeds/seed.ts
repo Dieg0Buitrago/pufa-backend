@@ -45,7 +45,7 @@ async function seed() {
         ('productora', 'Productora', 'Empresa o persona que solicita permisos de rodaje', true),
         ('proveedor', 'Proveedor', 'Prestador de servicios audiovisuales registrado en el directorio', true),
         ('academico', 'Académico', 'Estudiante o investigador con aval institucional', true),
-        ('revisor', 'Revisor', 'Funcionario encargado de revisar y emitir conceptos sobre trámites PUFA', true)
+        ('revisor', 'Revisor', 'Personal interno de la Secretaría de Cultura encargado de revisar y aprobar trámites PUFA', true)
       ON CONFLICT (codigo) DO NOTHING
     `);
 
@@ -344,39 +344,26 @@ async function seed() {
     `);
 
     // --- TIPOS DE DOCUMENTO ---
-    // Actualiza los existentes y agrega los faltantes usando nombre como clave natural
-    const tiposDocumento = [
-      { nombre: 'Cédula de ciudadanía',                     descripcion: 'Documento de identidad del solicitante',                                             aplica_a: 'registro_natural',  obligatorio: true  },
-      { nombre: 'RUT',                                       descripcion: 'Registro Único Tributario actualizado',                                              aplica_a: 'registro_juridica', obligatorio: true  },
-      { nombre: 'Cámara de comercio',                        descripcion: 'Certificado de existencia y representación legal vigente (no mayor a 90 días)',      aplica_a: 'registro_juridica', obligatorio: true  },
-      { nombre: 'Acta de constitución',                      descripcion: 'Copia del acta de constitución de la persona jurídica',                             aplica_a: 'registro_juridica', obligatorio: true  },
-      { nombre: 'Acta de nombramiento de representante legal', descripcion: 'Acta vigente de nombramiento del representante legal',                            aplica_a: 'registro_juridica', obligatorio: true  },
-      { nombre: 'Carta de intención del proyecto',           descripcion: 'Descripción detallada del proyecto de rodaje',                                      aplica_a: 'tramite',           obligatorio: true  },
-      { nombre: 'Plan de contingencia',                      descripcion: 'Plan para el manejo de emergencias durante el rodaje',                               aplica_a: 'tramite',           obligatorio: true  },
-      { nombre: 'Soporte de pago',                           descripcion: 'Comprobante del pago o abono realizado',                                            aplica_a: 'pago',              obligatorio: true  },
-      { nombre: 'Permiso de Aeronáutica Civil',              descripcion: 'Autorización UAEAC para el uso de drones',                                          aplica_a: 'tramite',           obligatorio: false },
-      { nombre: 'Plan de manejo de tránsito',                descripcion: 'Plan aprobado por la autoridad de tránsito competente',                             aplica_a: 'tramite',           obligatorio: false },
-      { nombre: 'Consentimiento de comunidades',             descripcion: 'Acta de consentimiento libre, previo e informado de comunidades étnicas',           aplica_a: 'tramite',           obligatorio: false },
-      { nombre: 'Póliza de responsabilidad civil',           descripcion: 'Seguro de RC vigente para la producción',                                          aplica_a: 'tramite',           obligatorio: false },
-      { nombre: 'Aval institucional',                        descripcion: 'Carta de aval de la institución educativa (para trámites académicos)',              aplica_a: 'tramite',           obligatorio: false },
-    ];
-    for (const t of tiposDocumento) {
-      const existe = await qr.query(
-        `SELECT id FROM tipos_documento WHERE nombre = $1 LIMIT 1`,
-        [t.nombre],
-      );
-      if (existe.length > 0) {
-        await qr.query(
-          `UPDATE tipos_documento SET aplica_a = $1, obligatorio = $2 WHERE nombre = $3`,
-          [t.aplica_a, t.obligatorio, t.nombre],
-        );
-      } else {
-        await qr.query(
-          `INSERT INTO tipos_documento (nombre, descripcion, aplica_a, obligatorio, activo) VALUES ($1, $2, $3, $4, true)`,
-          [t.nombre, t.descripcion, t.aplica_a, t.obligatorio],
-        );
-      }
-    }
+    // Inserta o actualiza usando código como clave natural; mantiene aplica_a detallado por registro_natural/juridica
+    await qr.query(`
+      INSERT INTO tipos_documento (codigo, nombre, descripcion, aplica_a, obligatorio, activo) VALUES
+        ('documento_identidad',        'Cédula de ciudadanía',                   'Documento de identidad del solicitante',                                              'registro_natural',  true,  true),
+        ('rut',                        'RUT',                                    'Registro Único Tributario actualizado',                                               'registro_juridica', true,  true),
+        ('certificado_existencia',     'Cámara de comercio',                     'Certificado de existencia y representación legal vigente (no mayor a 90 días)',       'registro_juridica', true,  true),
+        ('acta_constitucion',          'Acta de constitución',                   'Copia del acta de constitución de la persona jurídica',                              'registro_juridica', true,  true),
+        ('acta_nombramiento',          'Acta de nombramiento de representante legal', 'Acta vigente de nombramiento del representante legal',                          'registro_juridica', true,  true),
+        ('carta_intencion',            'Carta de intención del proyecto',        'Descripción detallada del proyecto de rodaje',                                       'tramite',           true,  true),
+        ('plan_contingencia',          'Plan de contingencia',                   'Plan para el manejo de emergencias durante el rodaje',                                'tramite',           true,  true),
+        ('soporte_pago',               'Soporte de pago',                        'Comprobante del pago o abono realizado',                                              'pago',              true,  true),
+        ('permiso_aeronautica',        'Permiso de Aeronáutica Civil',           'Autorización UAEAC para el uso de drones',                                            'tramite',           false, true),
+        ('plan_transito',              'Plan de manejo de tránsito',             'Plan aprobado por la autoridad de tránsito competente',                               'tramite',           false, true),
+        ('consentimiento_comunidades', 'Consentimiento de comunidades',          'Acta de consentimiento libre, previo e informado de comunidades étnicas',             'tramite',           false, true),
+        ('poliza_rc',                  'Póliza de responsabilidad civil',        'Seguro de RC vigente para la producción',                                             'tramite',           false, true),
+        ('aval_institucional',         'Aval institucional',                     'Carta de aval de la institución educativa (para trámites académicos)',                'tramite',           false, true)
+      ON CONFLICT (codigo) DO UPDATE SET
+        aplica_a    = EXCLUDED.aplica_a,
+        obligatorio = EXCLUDED.obligatorio
+    `);
 
     // --- TIPOS DE CONVOCATORIA ---
     await qr.query(`

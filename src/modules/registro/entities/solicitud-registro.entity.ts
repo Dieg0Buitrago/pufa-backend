@@ -24,7 +24,7 @@ export class SolicitudRegistro {
   fecha_revision: Date;
 
   @Column({ type: 'timestamp', nullable: true })
-  fecha_respuesta: Date;
+  fecha_respuesta: Date | null;
 
   @Column({ nullable: true })
   admin_revisor_id: number;

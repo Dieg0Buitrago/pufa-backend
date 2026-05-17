@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DataSource } from 'typeorm';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -46,13 +47,47 @@ async function bootstrap() {
   warnIfNodeVersionIsNotLts();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const dataSource = app.get(DataSource);
+  const configService = app.get(ConfigService);
+
+  // Fail-fast: no iniciar API si PostgreSQL no está disponible o la BD no coincide.
+  if (!dataSource.isInitialized) {
+    throw new Error('No se pudo inicializar la conexión a PostgreSQL. Verifica que el servidor y la base de datos estén disponibles.');
+  }
+
+  const expectedDb = String(configService.get('database.database') || '').trim();
+  const dbResult = await dataSource.query('SELECT current_database() AS db_name');
+  const connectedDb = String(dbResult?.[0]?.db_name || '').trim();
+  if (!connectedDb) {
+    throw new Error('No se pudo detectar la base de datos activa en PostgreSQL.');
+  }
+  if (expectedDb && connectedDb !== expectedDb) {
+    throw new Error(`Base de datos incorrecta: conectada a "${connectedDb}" pero se esperaba "${expectedDb}".`);
+  }
+
+  // Validación adicional: confirma que es la base operativa esperada (no una BD vacía).
+  const requiredTables = ['usuarios', 'tramites', 'documentos'];
+  const tablesResult = await dataSource.query(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+    `,
+  );
+  const existingTables = new Set((tablesResult || []).map((row: any) => String(row.table_name || '').trim()));
+  const missingTables = requiredTables.filter((table) => !existingTables.has(table));
+
+  if (missingTables.length > 0) {
+    throw new Error(
+      `La conexión a PostgreSQL existe, pero la BD "${connectedDb}" no tiene tablas requeridas: ${missingTables.join(', ')}.`,
+    );
+  }
 
   // Archivos estáticos para la landing pública
   app.useStaticAssets(join(process.cwd(), 'public'));
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
   // Prefijo global de la API versionada
-  const configService = app.get(ConfigService);
   const prefix = configService.get<string>('app.prefix', 'api/v1');
   app.setGlobalPrefix(prefix);
 

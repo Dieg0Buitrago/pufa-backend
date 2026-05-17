@@ -15,8 +15,6 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
-    <!-- Google Maps API -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBe_oFNI8XGpDTWGQ2Ld3_8vDKN7eCNkrI"></script>
   </head>
   <body>
     <header class="gov-header">
@@ -204,11 +202,11 @@
               <img src="/assets/images/villa de leyva.jpg" alt="Villa de Leyva" />
               <h3>Villa de Leyva</h3>
             </article>
-            <article class="location-card"><img src="/assets/images/landscape-2.svg" alt="Laguna de Tota" /><h3>Laguna de Tota</h3></article>
-            <article class="location-card"><img src="/assets/images/landscape-3.svg" alt="Páramo de Ocetá" /><h3>Páramo de Ocetá</h3></article>
-            <article class="location-card"><img src="/assets/images/landscape-1.svg" alt="Puente de Boyacá" /><h3>Puente de Boyacá</h3></article>
-            <article class="location-card"><img src="/assets/images/landscape-2.svg" alt="Monguí" /><h3>Monguí</h3></article>
-            <article class="location-card"><img src="/assets/images/landscape-3.svg" alt="Cueva de los Cristales" /><h3>Cueva de los Cristales</h3></article>
+            <article class="location-card"><img src="/assets/images/boyaca-1.jpg" alt="Laguna de Tota" /><h3>Laguna de Tota</h3></article>
+            <article class="location-card"><img src="/assets/images/boyaca-2.jpg" alt="Páramo de Ocetá" /><h3>Páramo de Ocetá</h3></article>
+            <article class="location-card"><img src="/assets/images/boyaca-3.jpeg" alt="Puente de Boyacá" /><h3>Puente de Boyacá</h3></article>
+            <article class="location-card"><img src="/assets/images/boyaca-4.jpg" alt="Monguí" /><h3>Monguí</h3></article>
+            <article class="location-card"><img src="/assets/images/boyaca-5.jpg" alt="Cueva de los Cristales" /><h3>Cueva de los Cristales</h3></article>
           </div>
 
           <div class="center-action">
@@ -229,7 +227,7 @@
 
           <div class="news-grid">
             <article class="news-feature">
-              <img src="/assets/images/landscape-1.svg" alt="Premio cinematográfico" />
+              <img src="/assets/images/boyaca-4.jpg" alt="Premio cinematográfico" />
               <div class="news-overlay"></div>
               <div class="news-content">
                 <span class="news-tag">Premios</span>
@@ -244,15 +242,15 @@
 
             <aside class="news-list">
               <article>
-                <img src="/assets/images/landscape-2.svg" alt="Producción en Villa de Leyva" />
+                <img src="/assets/images/boyaca-1.jpg" alt="Producción en Villa de Leyva" />
                 <div><span>Producciones</span><h4>Nueva serie internacional se filma en Villa de Leyva</h4><small>10 Ene 2024</small></div>
               </article>
               <article>
-                <img src="/assets/images/landscape-3.svg" alt="Capacitación" />
+                <img src="/assets/images/boyaca-2.jpg" alt="Capacitación" />
                 <div><span>Capacitación</span><h4>Taller de capacitación para técnicos locales</h4><small>5 Ene 2024</small></div>
               </article>
               <article>
-                <img src="/assets/images/landscape-1.svg" alt="Convenio" />
+                <img src="/assets/images/boyaca-5.jpg" alt="Convenio" />
                 <div><span>Alianzas</span><h4>Convenio con universidades fortalece la industria</h4><small>28 Dic 2023</small></div>
               </article>
             </aside>
@@ -278,7 +276,15 @@
               <div class="contact-map"><strong>Tunja, Boyacá</strong><span>Código postal: 150001</span></div>
             </article>
 
-            <div id="map-container" class="map-section" style="height: 400px; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.08);"></div>
+            <div class="map-section">
+              <iframe
+                title="Mapa de contacto de PUFAB"
+                src="https://www.google.com/maps?q=Carrera%2011%20%2318-27%20Tunja%20Boyac%C3%A1&z=15&output=embed"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                allowfullscreen
+              ></iframe>
+            </div>
           </div>
         </div>
       </section>
@@ -324,40 +330,5 @@
 
     <script src="/api-client.js"></script>
     <script src="/nav-session.js"></script>
-    <script>
-      /**
-       * Inicializar Google Maps en la sección de contacto
-       */
-      function initializeMap() {
-        const gobernacionCoords = {
-          lat: 5.5262,
-          lng: -72.3014,
-        };
-
-        const mapContainer = document.getElementById('map-container');
-        if (!mapContainer) return;
-
-        const map = new google.maps.Map(mapContainer, {
-          zoom: 13,
-          center: gobernacionCoords,
-          mapTypeControl: false,
-          fullscreenControl: false,
-        });
-
-        new google.maps.Marker({
-          position: gobernacionCoords,
-          map: map,
-          title: 'Gobernación de Boyacá - Carrera 11 # 18-27, Tunja',
-          icon: '/assets/logos/logo-pufab.svg',
-        });
-      }
-
-      // Inicializar mapa cuando el documento esté listo
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeMap);
-      } else {
-        initializeMap();
-      }
-    </script>
   </body>
 </html>

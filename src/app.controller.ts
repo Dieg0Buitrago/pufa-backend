@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  BadRequestException,
   Get,
   Param,
   Post,
@@ -26,6 +27,7 @@ const SVGtoPDF = require('svg-to-pdfkit');
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from './modules/auth/decorators/current-user.decorator';
+import { Public } from './modules/auth/decorators/public.decorator';
 
 @Controller()
 export class AppController {
@@ -108,6 +110,33 @@ export class AppController {
     return perfil ?? null;
   }
 
+  private async getOrCreatePerfilProveedorPorUsuario(usuarioId: number) {
+    const perfilExistente = await this.getPerfilProveedorPorUsuario(usuarioId);
+    if (perfilExistente) {
+      return perfilExistente;
+    }
+
+    const [usuario] = await this.dataSource.query(
+      `SELECT id, telefono FROM usuarios WHERE id = $1::int LIMIT 1`,
+      [usuarioId],
+    );
+
+    if (!usuario) {
+      throw new BadRequestException('No se encontró el usuario autenticado');
+    }
+
+    const [perfilNuevo] = await this.dataSource.query(
+      `
+      INSERT INTO perfiles_proveedor (usuario_id, telefono, visible_directorio, verificado, estado, activo)
+      VALUES ($1::int, $2, true, false, 'pendiente', true)
+      RETURNING id, usuario_id, descripcion_perfil, sitio_web, verificado, visible_directorio, telefono, estado, activo
+    `,
+      [usuarioId, usuario.telefono ?? null],
+    );
+
+    return perfilNuevo ?? null;
+  }
+
   private async ensureProveedorPortalTables(perfilId: number) {
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS proveedor_disponibilidad (
@@ -130,6 +159,35 @@ export class AppController {
         fecha DATE NOT NULL,
         texto TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS proveedor_servicios (
+        id SERIAL PRIMARY KEY,
+        perfil_proveedor_id INTEGER NOT NULL,
+        nombre VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        categoria VARCHAR(120),
+        precio NUMERIC(15,2) DEFAULT 0,
+        imagen VARCHAR(255),
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS proveedor_galeria_trabajos (
+        id SERIAL PRIMARY KEY,
+        perfil_proveedor_id INTEGER NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        categoria VARCHAR(120),
+        imagen VARCHAR(255) NOT NULL,
+        orden INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
@@ -674,9 +732,19 @@ export class AppController {
     return { url: '/admin/' };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('portal/productor/permisos')
-  async getPortalPermisos(@Query('estado') estado?: string) {
-    const permisos = await this.dataSource.query(`
+  async getPortalPermisos(
+    @CurrentUser('id') usuarioId: number,
+    @CurrentUser('roles') roles: string[],
+    @Query('estado') estado?: string,
+  ) {
+    // Solo admin puede ver todos los permisos; usuarios normales ven solo los suyos
+    const esAdmin = roles.includes('admin') || roles.includes('revisor');
+    const filtroUsuario = esAdmin ? '' : `WHERE t.usuario_solicitante_id = $1::int`;
+    const params = esAdmin ? [] : [usuarioId];
+
+    const query = `
       SELECT
         t.id,
         t.numero_radicado,
@@ -706,9 +774,12 @@ export class AppController {
         LIMIT 1
       ) tl ON true
       LEFT JOIN municipios m ON m.id = tl.municipio_id
+      ${filtroUsuario}
       ORDER BY t.fecha_solicitud DESC
       LIMIT 50
-    `);
+    `;
+
+    const permisos = await this.dataSource.query(query, params);
 
     const correccionesRaw = await this.dataSource.query(`
       SELECT h.tramite_id, h.observacion
@@ -942,7 +1013,7 @@ export class AppController {
   @UseGuards(JwtAuthGuard)
   @Get('portal/proveedor/panel')
   async getPortalProveedorPanel(@CurrentUser('id') usuarioId: number) {
-    const perfil = await this.getPerfilProveedorPorUsuario(usuarioId);
+    const perfil = await this.getOrCreatePerfilProveedorPorUsuario(usuarioId);
     const perfilPublico = perfil ?? (await this.dataSource.query(`
       SELECT
         p.id,
@@ -962,14 +1033,35 @@ export class AppController {
       LIMIT 1
     `))[0];
 
-    const servicios = await this.dataSource.query(`
-      SELECT e.nombre
-      FROM perfil_proveedor_especialidades pe
-      INNER JOIN especialidades_proveedor e ON e.id = pe.especialidad_proveedor_id
-      WHERE pe.perfil_proveedor_id = $1
-      ORDER BY e.nombre ASC
-      LIMIT 6
-    `, [perfil?.id ?? perfilPublico?.id ?? 0]);
+    const perfilId = perfil?.id ?? perfilPublico?.id ?? 0;
+    await this.ensureProveedorPortalTables(perfilId);
+
+    const serviciosDirectos = await this.dataSource.query(`
+      SELECT id, nombre, descripcion, categoria, precio, imagen, activo
+      FROM proveedor_servicios
+      WHERE perfil_proveedor_id = $1
+      ORDER BY created_at DESC, id DESC
+      LIMIT 12
+    `, [perfilId]);
+
+    const servicios = serviciosDirectos.length
+      ? serviciosDirectos
+      : await this.dataSource.query(`
+        SELECT e.nombre
+        FROM perfil_proveedor_especialidades pe
+        INNER JOIN especialidades_proveedor e ON e.id = pe.especialidad_proveedor_id
+        WHERE pe.perfil_proveedor_id = $1
+        ORDER BY e.nombre ASC
+        LIMIT 6
+      `, [perfilId]);
+
+    const galeria = await this.dataSource.query(`
+      SELECT id, titulo, descripcion, categoria, imagen, orden
+      FROM proveedor_galeria_trabajos
+      WHERE perfil_proveedor_id = $1
+      ORDER BY orden ASC, created_at DESC, id DESC
+      LIMIT 12
+    `, [perfilId]);
 
     const solicitudesRaw = await this.dataSource.query(`
       SELECT
@@ -1011,10 +1103,32 @@ export class AppController {
         perfil?.descripcion_perfil ?? perfilPublico?.descripcion_perfil ?? 'Perfil profesional para servicios audiovisuales en Boyacá.',
       metricas,
       servicios: servicios.length
-        ? servicios.map((s: any, idx: number) => ({ nombre: s.nombre, precio: 150000 + idx * 50000 }))
+        ? servicios.map((s: any, idx: number) => ({
+          id: s.id ?? idx + 1,
+          nombre: s.nombre,
+          descripcion: s.descripcion ?? null,
+          categoria: s.categoria ?? null,
+          precio: Number(s.precio ?? 150000 + idx * 50000),
+          imagen: s.imagen ?? null,
+          activo: s.activo ?? true,
+        }))
         : [
           { nombre: 'Servicio audiovisual', precio: 180000 },
           { nombre: 'Soporte técnico', precio: 220000 },
+        ],
+      galeria: galeria.length
+        ? galeria.map((g: any) => ({
+          id: g.id,
+          titulo: g.titulo,
+          descripcion: g.descripcion ?? null,
+          categoria: g.categoria ?? null,
+          imagen: g.imagen,
+          orden: g.orden ?? 1,
+        }))
+        : [
+          { titulo: 'Rodaje documental en Villa de Leyva', imagen: '/assets/location-placeholder.svg', categoria: 'Documental' },
+          { titulo: 'Scouting de locaciones rurales', imagen: '/assets/location-placeholder.svg', categoria: 'Locaciones' },
+          { titulo: 'Producción en centro histórico', imagen: '/assets/location-placeholder.svg', categoria: 'Producción' },
         ],
       solicitudes,
       contacto: {
@@ -1029,31 +1143,159 @@ export class AppController {
   @Get('portal/proveedor/portafolio')
   async getPortalProveedorPortafolio(@CurrentUser('id') usuarioId: number) {
     const panel = await this.getPortalProveedorPanel(usuarioId);
-    const galeria = [
-      {
-        titulo: 'Rodaje documental en Villa de Leyva',
-        imagen: '/assets/location-placeholder.svg',
-        categoria: 'Documental',
-      },
-      {
-        titulo: 'Scouting de locaciones rurales',
-        imagen: '/assets/location-placeholder.svg',
-        categoria: 'Locaciones',
-      },
-      {
-        titulo: 'Producción en centro histórico',
-        imagen: '/assets/location-placeholder.svg',
-        categoria: 'Producción',
-      },
-    ];
 
     return {
       nombre: panel.nombre,
       rol: panel.rol,
       descripcion: panel.descripcion,
       servicios: panel.servicios,
-      galeria,
+      galeria: panel.galeria,
     };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('portal/proveedor/servicios')
+  async getPortalProveedorServicios(@CurrentUser('id') usuarioId: number) {
+    const perfil = await this.getPerfilProveedorPorUsuario(usuarioId);
+    const perfilId = perfil?.id ?? 0;
+    await this.ensureProveedorPortalTables(perfilId);
+
+    const servicios = await this.dataSource.query(`
+      SELECT id, nombre, descripcion, categoria, precio, imagen, activo, created_at
+      FROM proveedor_servicios
+      WHERE perfil_proveedor_id = $1
+      ORDER BY created_at DESC, id DESC
+    `, [perfilId]);
+
+    return { data: servicios, total: servicios.length };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('portal/proveedor/servicios')
+  async crearPortalProveedorServicio(
+    @CurrentUser('id') usuarioId: number,
+    @Body('nombre') nombre?: string,
+    @Body('descripcion') descripcion?: string,
+    @Body('categoria') categoria?: string,
+    @Body('precio') precio?: string | number,
+  ) {
+    const perfil = await this.getOrCreatePerfilProveedorPorUsuario(usuarioId);
+
+    if (!nombre?.trim()) {
+      throw new BadRequestException('El nombre del servicio es obligatorio');
+    }
+
+    await this.ensureProveedorPortalTables(perfil.id);
+    const [saved] = await this.dataSource.query(
+      `
+      INSERT INTO proveedor_servicios (perfil_proveedor_id, nombre, descripcion, categoria, precio, activo)
+      VALUES ($1::int, $2, $3, $4, $5::numeric, true)
+      RETURNING id, nombre, descripcion, categoria, precio, imagen, activo, created_at
+    `,
+      [perfil.id, nombre.trim(), descripcion?.trim() || null, categoria?.trim() || null, Number(precio ?? 0) || 0],
+    );
+
+    return { ok: true, data: saved };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('portal/proveedor/galeria')
+  async getPortalProveedorGaleria(@CurrentUser('id') usuarioId: number) {
+    const perfil = await this.getOrCreatePerfilProveedorPorUsuario(usuarioId);
+    const perfilId = perfil?.id ?? 0;
+    await this.ensureProveedorPortalTables(perfilId);
+
+    const galeria = await this.dataSource.query(`
+      SELECT id, titulo, descripcion, categoria, imagen, orden, created_at
+      FROM proveedor_galeria_trabajos
+      WHERE perfil_proveedor_id = $1
+      ORDER BY orden ASC, created_at DESC, id DESC
+    `, [perfilId]);
+
+    return { data: galeria, total: galeria.length };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('portal/proveedor/galeria')
+  @UseInterceptors(FileInterceptor('imagen', {
+    storage: diskStorage({
+      destination: (_req, _file, cb) => {
+        const dir = join(process.cwd(), 'uploads', 'proveedor');
+        if (!existsSync(dir)) {
+          mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+      },
+      filename: (_req, file, cb) => {
+        const safeExt = extname(file.originalname || '').toLowerCase() || '.jpg';
+        cb(null, `${Date.now()}-${randomUUID()}${safeExt}`);
+      },
+    }),
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      cb(null, allowed.includes(file.mimetype));
+    },
+    limits: { fileSize: 8 * 1024 * 1024 },
+  }))
+  async crearPortalProveedorGaleria(
+    @CurrentUser('id') usuarioId: number,
+    @UploadedFile() imagen?: Express.Multer.File,
+    @Body('titulo') titulo?: string,
+    @Body('descripcion') descripcion?: string,
+    @Body('categoria') categoria?: string,
+  ) {
+    const perfil = await this.getOrCreatePerfilProveedorPorUsuario(usuarioId);
+
+    if (!imagen) {
+      throw new BadRequestException('Debes adjuntar una imagen válida');
+    }
+
+    if (!titulo?.trim()) {
+      throw new BadRequestException('El título de la imagen es obligatorio');
+    }
+
+    await this.ensureProveedorPortalTables(perfil.id);
+    const [count] = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS total FROM proveedor_galeria_trabajos WHERE perfil_proveedor_id = $1`,
+      [perfil.id],
+    );
+
+    const publicUrl = `/uploads/proveedor/${imagen.filename}`;
+    const [saved] = await this.dataSource.query(
+      `
+      INSERT INTO proveedor_galeria_trabajos (perfil_proveedor_id, titulo, descripcion, categoria, imagen, orden)
+      VALUES ($1::int, $2, $3, $4, $5, $6)
+      RETURNING id, titulo, descripcion, categoria, imagen, orden, created_at
+    `,
+      [perfil.id, titulo.trim(), descripcion?.trim() || null, categoria?.trim() || null, publicUrl, (count?.total ?? 0) + 1],
+    );
+
+    return { ok: true, data: saved };
+  }
+
+  @Public()
+  @Get('portal/proveedor/servicios-publicos')
+  async getPortalProveedorServiciosPublicos() {
+    const servicios = await this.dataSource.query(`
+      SELECT
+        s.id,
+        s.nombre,
+        s.descripcion,
+        s.categoria,
+        s.precio,
+        s.imagen,
+        s.activo,
+        p.id AS perfil_id,
+        COALESCE(u.email, 'proveedor') AS proveedor_nombre
+      FROM proveedor_servicios s
+      INNER JOIN perfiles_proveedor p ON p.id = s.perfil_proveedor_id
+      INNER JOIN usuarios u ON u.id = p.usuario_id
+      WHERE s.activo = true
+      ORDER BY s.created_at DESC, s.id DESC
+      LIMIT 200
+    `);
+
+    return { data: servicios, total: servicios.length };
   }
 
   @UseGuards(JwtAuthGuard)

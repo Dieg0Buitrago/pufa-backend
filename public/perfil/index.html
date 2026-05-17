@@ -409,6 +409,8 @@
           .replaceAll("'", '&#39;');
       }
 
+      const MAX_PROFILE_PHOTO_SIZE = 10 * 1024 * 1024;
+
       function fmtDate(value) {
         if (!value) return 'No disponible';
         const date = new Date(value);
@@ -494,8 +496,9 @@
                   <div class="upload-preview" id="uploadPreview">${avatar}</div>
                   <div style="color:#334155; font-size:.93rem; line-height:1.45;">Sube una imagen cuadrada para personalizar tu perfil. Se admiten JPG, PNG y WEBP.</div>
                   <input id="photoInput" type="file" accept="image/*" style="display:none;" />
+                  <div id="photoFileName" style="font-size:.85rem; color:#64748b; margin-top:-0.15rem;">Sin archivo seleccionado</div>
                   <div class="upload-buttons">
-                    <label for="photoInput" class="pick">Seleccionar foto</label>
+                    <button type="button" class="pick" id="pickPhotoBtn">Seleccionar foto</button>
                     <button type="button" class="clear" id="clearPhotoBtn">Limpiar</button>
                     <button type="button" class="upload" id="uploadPhotoBtn">Guardar foto</button>
                   </div>
@@ -587,16 +590,35 @@
         });
 
         const photoInput = document.getElementById('photoInput');
+        const pickPhotoBtn = document.getElementById('pickPhotoBtn');
         const uploadPreview = document.getElementById('uploadPreview');
         const avatarBox = document.getElementById('avatarBox');
+        const photoFileName = document.getElementById('photoFileName');
         let selectedFile = null;
+
+        pickPhotoBtn?.addEventListener('click', () => {
+          photoInput?.click();
+        });
 
         photoInput.addEventListener('change', () => {
           selectedFile = photoInput.files?.[0] || null;
           if (!selectedFile) {
             uploadPreview.innerHTML = avatar;
+            if (photoFileName) photoFileName.textContent = 'Sin archivo seleccionado';
             return;
           }
+
+          if (selectedFile.size > MAX_PROFILE_PHOTO_SIZE) {
+            alert('La foto supera el tamaño máximo permitido de 10 MB. Usa una imagen más ligera o comprímela antes de subirla.');
+            selectedFile = null;
+            photoInput.value = '';
+            uploadPreview.innerHTML = avatar;
+            avatarBox.innerHTML = avatar;
+            if (photoFileName) photoFileName.textContent = 'Sin archivo seleccionado';
+            return;
+          }
+
+          if (photoFileName) photoFileName.textContent = selectedFile.name;
 
           const reader = new FileReader();
           reader.onload = () => {
@@ -612,16 +634,23 @@
           photoInput.value = '';
           uploadPreview.innerHTML = avatar;
           avatarBox.innerHTML = avatar;
+          if (photoFileName) photoFileName.textContent = 'Sin archivo seleccionado';
         });
 
         document.getElementById('uploadPhotoBtn').addEventListener('click', async () => {
-          if (!selectedFile) {
+          const file = selectedFile || photoInput.files?.[0] || null;
+          if (!file) {
             alert('Selecciona una foto primero.');
             return;
           }
 
+          if (file.size > MAX_PROFILE_PHOTO_SIZE) {
+            alert('La foto supera el tamaño máximo permitido de 10 MB. Usa una imagen más ligera o comprímela antes de subirla.');
+            return;
+          }
+
           const formData = new FormData();
-          formData.append('foto', selectedFile);
+          formData.append('foto', file);
 
           try {
             const response = await fetch('/api/v1/auth/me/foto', {
@@ -630,7 +659,8 @@
               body: formData,
             });
 
-            const payload = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            const payload = contentType.includes('application/json') ? await response.json() : { mensaje: await response.text() };
             const data = payload?.datos || payload;
 
             if (!response.ok) {
@@ -644,6 +674,9 @@
             }
 
             await cargarPerfil();
+            selectedFile = null;
+            photoInput.value = '';
+            if (photoFileName) photoFileName.textContent = 'Sin archivo seleccionado';
           } catch (error) {
             alert('❌ ' + error.message);
           }

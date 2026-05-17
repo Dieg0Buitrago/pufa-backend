@@ -181,21 +181,24 @@
       }
 
       .btn-primary {
-        background: var(--green-700);
+        background: linear-gradient(135deg, #1b5e20, #2e7d32);
         color: white;
+        box-shadow: 0 10px 24px rgba(46, 125, 50, 0.22);
       }
 
       .btn-primary:hover {
-        background: #1e4620;
+        background: linear-gradient(135deg, #16481a, #256428);
       }
 
       .btn-secondary {
-        background: #e0e0e0;
-        color: #333;
+        background: #fff;
+        color: #1e3a8a;
+        border: 1px solid #c7d2fe;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
       }
 
       .btn-secondary:hover {
-        background: #d0d0d0;
+        background: #eff6ff;
       }
 
       .loading {
@@ -288,15 +291,10 @@
           const proyecto = await API_CLIENT.proyectos.obtener(proyectoId);
 
           $html(proyecto);
+          await renderDocumentosProyecto(proyecto.id);
 
-          // Cargar trámites del proyecto
-          try {
-            const tramites = await API_CLIENT.tramites.listar(1, 100);
-            const tramitesDelProyecto = (tramites.data || tramites).filter((t) => t.proyecto_id == proyectoId);
-            renderTramites(tramitesDelProyecto);
-          } catch (e) {
-            console.log('Error cargando trámites');
-          }
+          const tramitesDelProyecto = Array.isArray(proyecto.tramites) ? proyecto.tramites : [];
+          renderTramites(tramitesDelProyecto);
         } catch (error) {
           errorContainer.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
           contentContainer.style.display = 'none';
@@ -304,13 +302,19 @@
       }
 
       function $html(proyecto) {
+        const inicio = proyecto.fecha_inicio_prevista ? new Date(proyecto.fecha_inicio_prevista) : null;
+        const fin = proyecto.fecha_fin_prevista ? new Date(proyecto.fecha_fin_prevista) : null;
+        const duracionDias = inicio && fin
+          ? Math.max(1, Math.floor((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+          : null;
+
         contentContainer.innerHTML = `
           <div class="detail-grid">
             <div class="detail-main">
               <div class="detail-card">
                 <div class="detail-header">
                   <div>
-                    <h1>${proyecto.titulo}</h1>
+                    <h1>${proyecto.nombre_proyecto || 'Proyecto sin título'}</h1>
                     <p style="margin: 0.5rem 0 0; color: #768794; font-size: 13px;">ID: ${proyecto.id}</p>
                   </div>
                 </div>
@@ -330,31 +334,36 @@
                   </div>
                   <div class="info-item">
                     <strong>Presupuesto</strong>
-                    <span>$${(proyecto.presupuesto || 0).toLocaleString('es-CO')}</span>
+                    <span>$${Number(proyecto.presupuesto_total || 0).toLocaleString('es-CO')}</span>
                   </div>
                   <div class="info-item">
                     <strong>Fecha de Inicio</strong>
-                    <span>${new Date(proyecto.fecha_inicio || Date.now()).toLocaleDateString('es-CO')}</span>
+                    <span>${proyecto.fecha_inicio_prevista ? new Date(proyecto.fecha_inicio_prevista).toLocaleDateString('es-CO') : 'N/A'}</span>
                   </div>
                   <div class="info-item">
                     <strong>Duración (días)</strong>
-                    <span>${proyecto.duracion_dias || 'N/A'} días</span>
+                    <span>${duracionDias || 'N/A'} días</span>
                   </div>
                 </div>
 
                 <div class="section-title">📝 Descripción</div>
-                <p>${proyecto.descripcion || 'Sin descripción'}</p>
+                <p>${proyecto.sinopsis || 'Sin descripción'}</p>
 
                 <div class="section-title">🎥 Equipo Técnico</div>
                 <p style="color: #768794;">
-                  ${proyecto.equipo_tamanio ? `Tamaño del equipo: ${proyecto.equipo_tamanio}` : 'Sin información de equipo'}
+                  ${proyecto.tamano_equipo ? `Tamaño del equipo: ${proyecto.tamano_equipo}` : 'Sin información de equipo'}
                 </p>
 
                 <div class="section-title">📞 Contacto</div>
                 <ul style="margin: 0; padding-left: 1rem; color: #768794;">
-                  <li>Contacto: ${proyecto.contacto || 'N/A'}</li>
-                  <li>Teléfono: ${proyecto.telefono || 'N/A'}</li>
+                  <li>Contacto: ${proyecto.contacto_principal || proyecto.usuario?.email || 'N/A'}</li>
+                  <li>Teléfono: ${proyecto.telefono_contacto || proyecto.usuario?.telefono || 'N/A'}</li>
                 </ul>
+
+                <div class="section-title">📎 Documentos adicionales</div>
+                <div class="tramites-list" id="documentosProyectoList">
+                  <p class="loading">Cargando documentos...</p>
+                </div>
 
                 <div class="section-title">🎬 Trámites Asociados</div>
                 <div class="tramites-list" id="tramitesList">
@@ -389,7 +398,7 @@
                 <h3>Acciones</h3>
                 <div class="action-buttons">
                   <a href="/crear-tramite/?proyecto-id=${proyecto.id}" class="btn btn-primary">+ Crear Trámite</a>
-                  <button class="btn btn-secondary" onclick="alert('Editar proyecto')">Editar Proyecto</button>
+                  <a href="/editar-proyecto/?id=${proyecto.id}" class="btn btn-secondary">Editar Proyecto</a>
                 </div>
               </div>
             </aside>
@@ -420,6 +429,60 @@
         `
           )
           .join('');
+      }
+
+      async function renderDocumentosProyecto(proyectoIdValue) {
+        const container = document.getElementById('documentosProyectoList');
+        if (!container) return;
+
+        try {
+          const documentos = await API_CLIENT.documentos.listarPorProyecto(proyectoIdValue);
+          const docs = documentos.data || documentos;
+
+          if (!docs || docs.length === 0) {
+            container.innerHTML = '<p style="color: #768794;">Sin documentos adicionales</p>';
+            return;
+          }
+
+          container.innerHTML = docs
+            .map(
+              (d) => `
+                <div class="tramite-item">
+                  <div class="tramite-info">
+                    <div class="tramite-title">📄 ${d.nombre_original || 'Documento'}</div>
+                    <div class="tramite-meta">${new Date(d.fecha_subida || Date.now()).toLocaleDateString('es-CO')}</div>
+                  </div>
+                  <button class="btn btn-primary" onclick="downloadDocumentoProyecto(${d.id})" style="padding: 0.4rem 0.8rem; font-size: 12px; width: auto;">Descargar</button>
+                </div>
+              `,
+            )
+            .join('');
+        } catch (error) {
+          container.innerHTML = '<p style="color: #b91c1c;">No se pudieron cargar documentos</p>';
+        }
+      }
+
+      async function downloadDocumentoProyecto(docId) {
+        try {
+          const token = localStorage.getItem('pufab_token');
+          const resp = await fetch(`/api/v1/documentos/${docId}/descargar`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+
+          if (!resp.ok) throw new Error('No se pudo descargar el documento');
+
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `documento-proyecto-${docId}`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          alert('Error descargando documento: ' + error.message);
+        }
       }
     </script>
   </body>

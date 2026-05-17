@@ -1624,7 +1624,6 @@
           'segundo_nombre',
           'primer_apellido',
           'segundo_apellido',
-          'lugar_nacimiento_id',
           'municipio_residencia_id',
           'direccion',
           'sexo_nacer_id',
@@ -1648,6 +1647,12 @@
           'ingles_lee',
           'ingles_escribe',
         ]);
+
+        // Mapear lugar de nacimiento a texto (DTO espera `lugar_nacimiento` como string)
+        const lugarNacimientoSelect = form.querySelector('[name="lugar_nacimiento_id"]');
+        if (lugarNacimientoSelect && lugarNacimientoSelect.value) {
+          perfilNatural.lugar_nacimiento = lugarNacimientoSelect.selectedOptions?.[0]?.text || String(readField('lugar_nacimiento_id'));
+        }
 
         const perfilJuridica = readSection([
           'razon_social',
@@ -1686,9 +1691,6 @@
           telefono: telefono || undefined,
           tipo_persona: selectedPersona,
           rolSolicitado: role,
-          municipio_base_id: readField('municipio_base_id'),
-          tiempo_operando_sector_id: readField('tiempo_operando_sector_id'),
-          descripcion_productora: readField('descripcion_productora'),
           perfilNatural: selectedPersona === 'natural' ? perfilNatural : undefined,
           perfilJuridica: selectedPersona === 'juridica' ? perfilJuridica : undefined,
           nombre:

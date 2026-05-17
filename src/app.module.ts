@@ -38,6 +38,8 @@ import { EntidadesModule } from './modules/entidades/entidades.module';
         autoLoadEntities: true,
         synchronize: configService.get('database.synchronize'),
         logging: configService.get('database.logging'),
+        retryAttempts: 1,
+        retryDelay: 0,
       }),
       inject: [ConfigService],
     }),

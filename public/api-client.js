@@ -248,16 +248,19 @@ const API_CLIENT = (function () {
 
     // Documentos
     documentos: {
-      subir: (archivo, tipoDocumentoId, tramiteId, solicitudRegistroId) => {
+      subir: (archivo, tipoDocumentoId, tramiteId, solicitudRegistroId, proyectoId) => {
         const formData = new FormData();
         formData.append('archivo', archivo);
         if (tipoDocumentoId) formData.append('tipo_documento_id', tipoDocumentoId);
         if (tramiteId) formData.append('tramite_id', tramiteId);
         if (solicitudRegistroId) formData.append('solicitud_registro_id', solicitudRegistroId);
+        if (proyectoId) formData.append('proyecto_id', proyectoId);
         return requestFormData('POST', '/documentos/subir', formData);
       },
       listarPorTramite: (tramiteId) =>
         request('GET', `/documentos/tramite/${tramiteId}`),
+      listarPorProyecto: (proyectoId) =>
+        request('GET', `/documentos/proyecto/${proyectoId}`),
       validar: (id, estado, observaciones) =>
         request('PATCH', `/documentos/${id}/validar`, { estado, observaciones }),
     },
@@ -293,6 +296,11 @@ const API_CLIENT = (function () {
         locacionesMenu: () => request('GET', '/portal/productor/locaciones-menu'),
       },
       proveedor: {
+        servicios: () => request('GET', '/portal/proveedor/servicios'),
+        serviciosPublicos: () => request('GET', '/portal/proveedor/servicios-publicos'),
+        crearServicio: (data) => request('POST', '/portal/proveedor/servicios', data),
+        galeria: () => request('GET', '/portal/proveedor/galeria'),
+        crearGaleria: (formData) => requestFormData('POST', '/portal/proveedor/galeria', formData),
         panel: () => request('GET', '/portal/proveedor/panel'),
         portafolio: () => request('GET', '/portal/proveedor/portafolio'),
         disponibilidad: () => request('GET', '/portal/proveedor/disponibilidad'),

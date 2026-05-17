@@ -17,11 +17,14 @@ import { diskStorage } from 'multer';
 import { existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
+import appConfig from '../../config/app.config';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  private static readonly maxProfilePhotoSize = appConfig().maxFileSizeMb * 1024 * 1024;
 
   private static storagePerfil = diskStorage({
     destination: (req, file, cb) => {
@@ -81,7 +84,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Actualizar foto de perfil', description: 'Sube una imagen para personalizar el avatar del usuario autenticado.' })
   @UseInterceptors(FileInterceptor('foto', {
     storage: AuthController.storagePerfil,
-    limits: { fileSize: 2 * 1024 * 1024 },
+    limits: { fileSize: AuthController.maxProfilePhotoSize },
   }))
   actualizarFotoPerfil(
     @CurrentUser('id') usuarioId: number,

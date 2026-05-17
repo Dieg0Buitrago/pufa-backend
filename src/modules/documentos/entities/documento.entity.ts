@@ -21,6 +21,9 @@ export class Documento {
   tramite_id: number;
 
   @Column({ nullable: true })
+  proyecto_id: number;
+
+  @Column({ nullable: true })
   tipo_documento_id: number;
 
   // Versioning: permite subir nueva versión del mismo documento

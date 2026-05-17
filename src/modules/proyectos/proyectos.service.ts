@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Proyecto } from './entities/proyecto.entity';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 
@@ -9,6 +9,7 @@ export class ProyectosService {
   constructor(
     @InjectRepository(Proyecto)
     private proyectosRepo: Repository<Proyecto>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // Lista proyectos del usuario autenticado con paginación
@@ -40,7 +41,27 @@ export class ProyectosService {
       throw new ForbiddenException('No tiene permiso para ver este proyecto');
     }
 
-    return proyecto;
+    const tramites = await this.dataSource.query(
+      `
+      SELECT
+        t.id,
+        t.numero_radicado AS radicado,
+        t.fecha_creacion,
+        COALESCE(e.nombre, 'Pendiente') AS estado,
+        t.estado_tramite_id,
+        t.proyecto_id
+      FROM tramites t
+      LEFT JOIN estados_tramite e ON e.id = t.estado_tramite_id
+      WHERE t.proyecto_id = $1::int
+      ORDER BY t.fecha_creacion DESC, t.id DESC
+    `,
+      [id],
+    );
+
+    return {
+      ...proyecto,
+      tramites,
+    };
   }
 
   // Crea un nuevo proyecto para el usuario autenticado

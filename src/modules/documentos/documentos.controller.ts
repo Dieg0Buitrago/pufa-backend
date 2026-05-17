@@ -37,6 +37,7 @@ export class DocumentosController {
         archivo: { type: 'string', format: 'binary', description: 'Archivo a subir (máx. 10 MB)' },
         tipo_documento_id: { type: 'number', example: 1, description: 'ID del tipo de documento' },
         tramite_id: { type: 'number', example: 1, description: 'ID del trámite al que pertenece' },
+        proyecto_id: { type: 'number', example: 1, description: 'ID del proyecto al que pertenece' },
         solicitud_registro_id: { type: 'number', description: 'ID de la solicitud de registro (alternativo a tramite_id)' },
       },
       required: ['archivo'],
@@ -60,10 +61,11 @@ export class DocumentosController {
     @CurrentUser('id') usuarioId: number,
     @Body('tipo_documento_id', new ParseIntPipe({ optional: true })) tipoDocumentoId?: number,
     @Body('tramite_id', new ParseIntPipe({ optional: true })) tramiteId?: number,
+    @Body('proyecto_id', new ParseIntPipe({ optional: true })) proyectoId?: number,
     @Body('solicitud_registro_id', new ParseIntPipe({ optional: true })) solicitudId?: number,
   ) {
     return this.documentosService.registrarDocumento(
-      usuarioId, archivo, tipoDocumentoId, tramiteId, solicitudId,
+      usuarioId, archivo, tipoDocumentoId, tramiteId, proyectoId, solicitudId,
     );
   }
 
@@ -73,6 +75,14 @@ export class DocumentosController {
   @ApiResponse({ status: 200, description: 'Lista de documentos del trámite con su estado de validación.' })
   listarPorTramite(@Param('tramiteId', ParseIntPipe) tramiteId: number) {
     return this.documentosService.listarPorTramite(tramiteId);
+  }
+
+  @Get('proyecto/:proyectoId')
+  @ApiOperation({ summary: 'Listar documentos de un proyecto' })
+  @ApiParam({ name: 'proyectoId', description: 'ID del proyecto' })
+  @ApiResponse({ status: 200, description: 'Lista de documentos del proyecto.' })
+  listarPorProyecto(@Param('proyectoId', ParseIntPipe) proyectoId: number) {
+    return this.documentosService.listarPorProyecto(proyectoId);
   }
 
   @Roles('admin')

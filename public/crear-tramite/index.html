@@ -421,9 +421,10 @@
       let locacionesDisponibles = [];
       let equipoTecnico = [];
       let documentos = [];
+      const queryParams = new URLSearchParams(window.location.search);
+      const proyectoDesdeUrl = queryParams.get('proyecto-id') || queryParams.get('proyectoId') || queryParams.get('proyecto_id');
       const reservaLocacionPendiente = (() => {
-        const params = new URLSearchParams(window.location.search);
-        const fromQuery = params.get('locacion');
+        const fromQuery = queryParams.get('locacion');
         if (fromQuery) return fromQuery;
         try {
           return JSON.parse(localStorage.getItem('pufab_reserva_locacion') || 'null')?.id_unico || null;
@@ -475,6 +476,15 @@
           if (selectProyecto.options.length <= 1) {
             selectProyecto.innerHTML = '<option value="">No hay proyectos registrados</option>';
           }
+
+          if (proyectoDesdeUrl) {
+            selectProyecto.value = proyectoDesdeUrl;
+            if (selectProyecto.value !== proyectoDesdeUrl) {
+              selectProyecto.innerHTML = `<option value="${proyectoDesdeUrl}" selected>Proyecto seleccionado: ${proyectoDesdeUrl}</option>` + selectProyecto.innerHTML;
+              selectProyecto.value = proyectoDesdeUrl;
+            }
+            selectProyecto.disabled = true;
+          }
         } else {
           try {
             const fallback = await API_CLIENT.proyectos.listar(1, 100);
@@ -486,6 +496,11 @@
               option.textContent = proy.titulo || proy.nombre_proyecto || `Proyecto ${proy.id}`;
               selectProyecto.appendChild(option);
             });
+
+            if (proyectoDesdeUrl) {
+              selectProyecto.value = proyectoDesdeUrl;
+              selectProyecto.disabled = true;
+            }
           } catch (fallbackError) {
             selectProyecto.innerHTML = '<option value="">No fue posible cargar proyectos</option>';
             console.error('Error cargando proyectos:', proyectosResult.reason, fallbackError);
@@ -728,6 +743,9 @@
           submitBtn.textContent = 'Creando solicitud...';
 
           const locacionesPayload = locaciones.map((loc) => ({
+            id_unico: loc.id_unico,
+            origen_tipo: loc.origen,
+            origen_id: loc.id_origen,
             municipio_id: loc.municipio_id || undefined,
             tipo_espacio_id: loc.tipo_espacio_id || undefined,
             nombre_lugar: loc.nombre_lugar,
@@ -781,7 +799,9 @@
           successDiv.style.display = 'block';
 
           setTimeout(() => {
-            if (tramiteId) {
+            if (proyectoDesdeUrl) {
+              window.location.href = `/detalle-proyecto/?id=${proyectoDesdeUrl}`;
+            } else if (tramiteId) {
               window.location.href = `/detalle-tramite/?id=${tramiteId}`;
             } else {
               window.location.href = '/tramites/';

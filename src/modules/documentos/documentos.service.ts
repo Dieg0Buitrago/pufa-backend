@@ -22,6 +22,7 @@ export class DocumentosService {
     archivo: Express.Multer.File,
     tipoDocumentoId?: number,
     tramiteId?: number,
+    proyectoId?: number,
     solicitudRegistroId?: number,
   ) {
     // Calcula hash SHA256 para verificar integridad del archivo
@@ -34,6 +35,7 @@ export class DocumentosService {
         usuario_id: usuarioId,
         tipo_documento_id: tipoDocumentoId,
         tramite_id: tramiteId,
+        proyecto_id: proyectoId,
         activo: true,
       },
     });
@@ -41,6 +43,7 @@ export class DocumentosService {
     const documento = this.documentosRepo.create({
       usuario_id: usuarioId,
       tramite_id: tramiteId,
+      proyecto_id: proyectoId,
       solicitud_registro_id: solicitudRegistroId,
       tipo_documento_id: tipoDocumentoId,
       version: versionActual + 1,
@@ -60,6 +63,15 @@ export class DocumentosService {
   async listarPorTramite(tramiteId: number) {
     return this.documentosRepo.find({
       where: { tramite_id: tramiteId, activo: true },
+      relations: ['tipo_documento'],
+      order: { fecha_subida: 'DESC' },
+    });
+  }
+
+  // Lista documentos de un proyecto
+  async listarPorProyecto(proyectoId: number) {
+    return this.documentosRepo.find({
+      where: { proyecto_id: proyectoId, activo: true },
       relations: ['tipo_documento'],
       order: { fecha_subida: 'DESC' },
     });

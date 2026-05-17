@@ -396,7 +396,7 @@
               <div class="detail-card">
                 <div class="detail-header">
                   <div>
-                    <h1>${tramite.proyecto?.titulo || 'Trámite'}</h1>
+                    <h1>${tramite.proyecto?.nombre_proyecto || 'Trámite'}</h1>
                     <p style="margin: 0.5rem 0 0; color: #768794; font-size: 13px;">Radicado: ${tramite.radicado || tramite.id}</p>
                   </div>
                   <span class="status-badge ${statusClass}">${tramite.estado || 'Pendiente'}</span>
@@ -409,7 +409,7 @@
                   </div>
                   <div class="info-item">
                     <strong>Proyecto</strong>
-                    <span>${tramite.proyecto?.titulo || 'N/A'}</span>
+                    <span>${tramite.proyecto?.nombre_proyecto || 'N/A'}</span>
                   </div>
                   <div class="info-item">
                     <strong>Fecha Creación</strong>
@@ -417,7 +417,7 @@
                   </div>
                   <div class="info-item">
                     <strong>Descripción Proyecto</strong>
-                    <span>${tramite.proyecto?.descripcion || 'N/A'}</span>
+                    <span>${tramite.proyecto?.sinopsis || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -545,8 +545,8 @@
               <div class="sidebar-card">
                 <h3>Proyecto</h3>
                 <ul>
-                  <li><strong>${tramite.proyecto?.titulo || 'N/A'}</strong></li>
-                  <li>Presupuesto: $${(tramite.proyecto?.presupuesto || 0).toLocaleString('es-CO')}</li>
+                  <li><strong>${tramite.proyecto?.nombre_proyecto || 'N/A'}</strong></li>
+                  <li>Presupuesto: $${Number(tramite.proyecto?.presupuesto_total || 0).toLocaleString('es-CO')}</li>
                   <li>Municipio: ${tramite.proyecto?.municipio_principal?.nombre || 'N/A'}</li>
                 </ul>
               </div>
@@ -577,13 +577,13 @@
             (d) => `
           <div class="document-item">
             <div class="document-info">
-              <div class="document-name">📄 ${d.nombre_archivo}</div>
+              <div class="document-name">📄 ${d.nombre_original || d.nombre_archivo || 'Documento'}</div>
               <div class="document-meta">
-                Estado: <strong>${d.estado || 'Pendiente'}</strong> • ${new Date(d.fecha_creacion).toLocaleDateString('es-CO')}
+                Estado: <strong>${d.estado_validacion || d.estado || 'pendiente'}</strong> • ${new Date(d.fecha_subida || d.fecha_creacion || Date.now()).toLocaleDateString('es-CO')}
               </div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-              <span class="status-badge status-${(d.estado || 'pendiente').toLowerCase()}">${d.estado || 'Pendiente'}</span>
+              <span class="status-badge status-${(d.estado_validacion || d.estado || 'pendiente').toLowerCase()}">${d.estado_validacion || d.estado || 'Pendiente'}</span>
               <button onclick="downloadDocumento(${d.id})" style="padding: 0.5rem 1rem; background: #0b3d91; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">📥 Descargar</button>
             </div>
           </div>
@@ -615,13 +615,16 @@
 
       async function downloadDocumento(docId) {
         try {
-          const resp = await fetch(`/api/v1/documentos/${docId}/descargar`);
+          const token = localStorage.getItem('pufab_token');
+          const resp = await fetch(`/api/v1/documentos/${docId}/descargar`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
           if (!resp.ok) throw new Error('No se pudo descargar el documento');
           const blob = await resp.blob();
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `documento-${docId}` + getExtensionFromContentType(resp.headers.get('content-type'));
+          a.download = getFilenameFromDisposition(resp.headers.get('content-disposition')) || (`documento-${docId}` + getExtensionFromContentType(resp.headers.get('content-type')));
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -629,6 +632,20 @@
         } catch (err) {
           alert('Error descargando documento: ' + err.message);
         }
+      }
+
+      function getFilenameFromDisposition(contentDisposition) {
+        if (!contentDisposition) return '';
+        const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match?.[1]) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const asciiMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+        return asciiMatch?.[1] || '';
       }
 
       function getExtensionFromContentType(contentType) {

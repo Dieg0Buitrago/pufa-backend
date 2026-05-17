@@ -19,9 +19,12 @@ export default registerAs('database', () => {
   const databaseUrl = process.env.DATABASE_URL?.trim();
 
   if (databaseUrl) {
+    const parsed = new URL(databaseUrl);
+    const databaseFromUrl = parsed.pathname.replace(/^\//, '');
     return {
       type: 'postgres',
       url: databaseUrl,
+      database: databaseFromUrl,
       entities: [__dirname + '/../**/*.entity{.ts,.js}'],
       synchronize: env === 'development',
       logging: env === 'development',

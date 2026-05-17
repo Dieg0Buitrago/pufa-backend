@@ -434,13 +434,13 @@
               (p) => `
             <div class="item-card">
               <div class="item-header">
-                <h3 class="item-title">${p.titulo}</h3>
-                <span class="item-badge">${p.estado || 'Borrador'}</span>
+                <h3 class="item-title">${p.nombre_proyecto || 'Proyecto sin título'}</h3>
+                <span class="item-badge">${p.estado_proyecto || p.estado || 'Borrador'}</span>
               </div>
-              <p style="margin: 0.5rem 0; font-size: 13px; color: var(--muted);">${p.descripcion || 'Sin descripción'}</p>
+              <p style="margin: 0.5rem 0; font-size: 13px; color: var(--muted);">${p.sinopsis || 'Sin descripción'}</p>
               <div class="item-meta">
-                <span>📹 ${p.tipo_produccion_id || 'N/A'}</span>
-                <span>💰 $${(p.presupuesto || 0).toLocaleString('es-CO')}</span>
+                <span>📹 ${p.tipo_produccion?.nombre || p.tipo_produccion_id || 'N/A'}</span>
+                <span>💰 $${Number(p.presupuesto_total || 0).toLocaleString('es-CO')}</span>
               </div>
               <div class="item-actions">
                 <a href="/detalle-proyecto/?id=${p.id}" class="btn-view">Ver</a>

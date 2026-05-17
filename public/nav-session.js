@@ -87,8 +87,8 @@
     },
     '/api/v1/portal/productor/locaciones': {
       datos: [
-        { id: 1, nombre: 'Centro Histórico de Tunja', provincia: 'Centro', tipo: 'urbano', precio: 1500000, imagen: '/assets/location-placeholder.svg' },
-        { id: 2, nombre: 'Lago de Tota', provincia: 'Sugamuxi', tipo: 'natural', precio: 2200000, imagen: '/assets/location-placeholder.svg' },
+        { id: 1, nombre: 'Centro Histórico de Tunja', provincia: 'Centro', tipo: 'urbano', precio: 1500000, imagen: '/assets/images/boyaca-1.jpg' },
+        { id: 2, nombre: 'Lago de Tota', provincia: 'Sugamuxi', tipo: 'natural', precio: 2200000, imagen: '/assets/images/boyaca-2.jpg' },
       ],
     },
     '/api/v1/portal/productor/evaluaciones': {
@@ -268,9 +268,9 @@
   const figmaAssetMap = {
     '55d910c5-1bcc-479c-acd9-c78a28860e9b': '/assets/govco.svg',
     '511e76a4-6700-42b7-9db5-458f4c2c18ba': '/assets/hero-boyaca.svg',
-    '98e6d230-4a3c-43e5-94c8-78be324402db': '/assets/news-placeholder.svg',
-    '6f13ec87-8cbe-4e88-b8a2-ee0ff5c5527c': '/assets/news-placeholder.svg',
-    '77a655c2-ce42-4373-9dcb-5d34cf237826': '/assets/news-placeholder.svg',
+    '98e6d230-4a3c-43e5-94c8-78be324402db': '/assets/images/boyaca-3.jpeg',
+    '6f13ec87-8cbe-4e88-b8a2-ee0ff5c5527c': '/assets/images/boyaca-4.jpg',
+    '77a655c2-ce42-4373-9dcb-5d34cf237826': '/assets/images/boyaca-5.jpg',
   };
 
   function fallbackFigmaImage(img) {
@@ -278,7 +278,7 @@
     if (!src.includes('figma.com/api/mcp/asset/')) return;
 
     const assetId = src.split('/asset/')[1]?.split(/[?#]/)[0] || '';
-    const mapped = figmaAssetMap[assetId] || '/assets/location-placeholder.svg';
+    const mapped = figmaAssetMap[assetId] || '/assets/images/boyaca-1.jpg';
     if (img.getAttribute('src') !== mapped) {
       img.setAttribute('src', mapped);
     }
@@ -373,6 +373,12 @@
   }
 
   function isActive(linkPath) {
+    if (currentPath.startsWith('/directorio/') && linkPath === '/directorio/') {
+      return true;
+    }
+    if (currentPath === '/contacto/' && linkPath === '/#contacto') {
+      return true;
+    }
     if (linkPath.startsWith('/#')) {
       return currentPath === '/' && currentHash === linkPath.slice(1);
     }
@@ -380,22 +386,113 @@
     return currentPath.startsWith(linkPath);
   }
 
-  const links = [
-    { href: '/', label: 'Inicio' },
+  const homeLinks = [
+    { href: '/#inicio', label: 'Inicio' },
     { href: '/#conocenos', label: 'Conózcanos' },
+    { href: '/#locaciones', label: 'Locaciones' },
+    { href: '/#noticias', label: 'Noticias' },
+    { href: '/#contacto', label: 'Contacto' },
     { href: '/directorio/', label: 'Directorio' },
-    { href: '/contacto/', label: 'Contacto' },
   ];
 
-  if (roleConfig) {
-    links.push({ href: roleConfig.path, label: roleConfig.label });
-  } else {
-    links.push({ href: '/iniciar-sesion/', label: 'Ingresar' });
-  }
+  const links = homeLinks;
 
   navLinks.innerHTML = links
     .map((link) => `<a href="${link.href}"${isActive(link.href) ? ' class="active"' : ''}>${link.label}</a>`)
     .join('');
+
+  const indicator = document.createElement('span');
+  indicator.className = 'nav-indicator';
+  navLinks.appendChild(indicator);
+
+  const linkElements = Array.from(navLinks.querySelectorAll('a'));
+  const sectionTargets = new Map();
+  let indicatorRaf = null;
+
+  function setIndicatorTo(linkEl) {
+    if (!linkEl) {
+      indicator.style.opacity = '0';
+      return;
+    }
+
+    const navRect = navLinks.getBoundingClientRect();
+    const linkRect = linkEl.getBoundingClientRect();
+    indicator.style.opacity = '1';
+    indicator.style.width = `${linkRect.width}px`;
+    indicator.style.transform = `translateX(${linkRect.left - navRect.left}px) scaleX(1)`;
+  }
+
+  function setActiveLink(targetHref) {
+    linkElements.forEach((el) => el.classList.toggle('active', el.getAttribute('href') === targetHref));
+    setIndicatorTo(linkElements.find((el) => el.getAttribute('href') === targetHref) || null);
+  }
+
+  function findHomeSectionInView() {
+    if (currentPath !== '/') return null;
+
+    const ordered = ['inicio', 'conocenos', 'locaciones', 'noticias', 'contacto'];
+    for (const id of ordered) {
+      const section = document.getElementById(id);
+      if (!section) continue;
+      const rect = section.getBoundingClientRect();
+      if (rect.top <= 120 && rect.bottom >= 120) return `/#${id}`;
+    }
+    return '/#inicio';
+  }
+
+  function refreshNavState() {
+    const activeHref = currentPath === '/' ? findHomeSectionInView() : links.find((link) => isActive(link.href))?.href;
+    if (activeHref) setActiveLink(activeHref);
+  }
+
+  function scheduleIndicatorUpdate(targetEl) {
+    if (indicatorRaf) cancelAnimationFrame(indicatorRaf);
+    indicatorRaf = requestAnimationFrame(() => setIndicatorTo(targetEl));
+  }
+
+  navLinks.addEventListener('pointerenter', (event) => {
+    const link = event.target.closest('a');
+    if (link) scheduleIndicatorUpdate(link);
+  }, true);
+
+  navLinks.addEventListener('pointermove', (event) => {
+    const link = event.target.closest('a');
+    if (link) scheduleIndicatorUpdate(link);
+  }, true);
+
+  navLinks.addEventListener('pointerleave', () => {
+    const active = linkElements.find((el) => el.classList.contains('active')) || linkElements[0] || null;
+    scheduleIndicatorUpdate(active);
+  });
+
+  if (currentPath === '/') {
+    const observerOptions = { threshold: [0.2, 0.4, 0.6], rootMargin: '-20% 0px -55% 0px' };
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible?.target?.id) {
+        setActiveLink(`/#${visible.target.id}`);
+      }
+    }, observerOptions);
+
+    ['inicio', 'conocenos', 'locaciones', 'noticias', 'contacto'].forEach((id) => {
+      const section = document.getElementById(id);
+      if (section) {
+        sectionTargets.set(id, section);
+        observer.observe(section);
+      }
+    });
+
+    window.addEventListener('scroll', refreshNavState, { passive: true });
+    window.addEventListener('resize', refreshNavState);
+    window.addEventListener('load', refreshNavState, { once: true });
+    refreshNavState();
+  } else {
+    window.addEventListener('resize', () => {
+      const active = linkElements.find((el) => el.classList.contains('active')) || null;
+      scheduleIndicatorUpdate(active);
+    });
+    refreshNavState();
+  }
 
   if (portalUser) {
     portalUser.textContent = session?.loggedIn ? session.name || roleConfig?.label || 'Usuario' : 'Invitado';

@@ -56,6 +56,18 @@
           <button type="button" id="cerrarModalImagenes" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
         </div>
         <p id="modalImagenesTitulo" style="margin:0 0 12px; color:#4b5563; font-size:13px;"></p>
+        
+        <div style="display:grid; gap:8px; margin-bottom:16px; padding:12px; background:#f3f4f6; border-radius:8px; border:1px solid #e5e7eb;">
+          <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
+            <label style="display:grid; gap:4px; font-size:13px;">
+              <span style="font-weight:500;">Agregar imagen</span>
+              <input type="file" id="nuevoArchivoImagen" accept="image/*" style="padding:6px; border:1px solid #d1d5db; border-radius:6px; background:#fff; font-size:12px;" />
+            </label>
+            <button type="button" id="btnSubirImagenLocacion" style="padding:8px 14px; background:#2d7e3e; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">📤 Subir</button>
+          </div>
+          <div id="uploadImagenStatus" style="font-size:12px; color:#6b7280;"></div>
+        </div>
+        
         <div id="listaImagenesLocacion" style="display:grid; gap:8px;"></div>
       </div>
     </div>
@@ -173,12 +185,15 @@
 
       function renderListaImagenesLocacion() {
         const items = imagenesLocacionState.items || [];
+        const listElement = document.getElementById('listaImagenesLocacion');
+        if (!listElement) return;
+
         if (!items.length) {
-          listaImagenesLocacion.innerHTML = '<p style="margin:0;color:#6b7280;">No hay imágenes para esta locación.</p>';
+          listElement.innerHTML = '<p style="margin:0;color:#6b7280;">No hay imágenes para esta locación.</p>';
           return;
         }
 
-        listaImagenesLocacion.innerHTML = items.map((img, index) => `
+        listElement.innerHTML = items.map((img, index) => `
           <div style="display:grid;grid-template-columns:72px 1fr auto;gap:10px;align-items:center;padding:8px;border:1px solid #e5e7eb;border-radius:8px;">
             <img src="${img.url}" alt="Imagen locación" style="width:72px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #d1d5db;" />
             <div>
@@ -193,13 +208,13 @@
           </div>
         `).join('');
 
-        listaImagenesLocacion.querySelectorAll('[data-move-up]').forEach((btn) => {
+        listElement.querySelectorAll('[data-move-up]').forEach((btn) => {
           btn.addEventListener('click', () => moverImagen(btn.getAttribute('data-move-up'), -1));
         });
-        listaImagenesLocacion.querySelectorAll('[data-move-down]').forEach((btn) => {
+        listElement.querySelectorAll('[data-move-down]').forEach((btn) => {
           btn.addEventListener('click', () => moverImagen(btn.getAttribute('data-move-down'), 1));
         });
-        listaImagenesLocacion.querySelectorAll('[data-delete-img]').forEach((btn) => {
+        listElement.querySelectorAll('[data-delete-img]').forEach((btn) => {
           btn.addEventListener('click', () => eliminarImagen(btn.getAttribute('data-delete-img')));
         });
       }
@@ -208,9 +223,15 @@
         try {
           const items = await cargarImagenesLocacion(locacionId);
           imagenesLocacionState = { locacionId, locacionNombre: nombre, items };
-          modalImagenesTitulo.textContent = `${nombre} (${items.length}/${MAX_IMAGENES_LOCACION} imágenes)`;
+          const modalTitulo = document.getElementById('modalImagenesTitulo');
+          if (modalTitulo) {
+            modalTitulo.textContent = `${nombre} (${items.length}/${MAX_IMAGENES_LOCACION} imágenes)`;
+          }
           renderListaImagenesLocacion();
-          modalImagenesLocacion.style.display = 'flex';
+          const modalOverlay = document.getElementById('modalImagenesLocacion');
+          if (modalOverlay) {
+            modalOverlay.style.display = 'flex';
+          }
         } catch (error) {
           alert('Error cargando imágenes: ' + error.message);
         }
@@ -261,7 +282,10 @@
           }
           const items = await cargarImagenesLocacion(imagenesLocacionState.locacionId);
           imagenesLocacionState.items = items;
-          modalImagenesTitulo.textContent = `${imagenesLocacionState.locacionNombre} (${items.length}/${MAX_IMAGENES_LOCACION} imágenes)`;
+          const modalTitulo = document.getElementById('modalImagenesTitulo');
+          if (modalTitulo) {
+            modalTitulo.textContent = `${imagenesLocacionState.locacionNombre} (${items.length}/${MAX_IMAGENES_LOCACION} imágenes)`;
+          }
           renderListaImagenesLocacion();
           await init();
         } catch (error) {
@@ -341,8 +365,76 @@
         }
       });
 
+      async function subirImagenLocacion() {
+        const fileInput = document.getElementById('nuevoArchivoImagen');
+        const statusDiv = document.getElementById('uploadImagenStatus');
+        if (!fileInput || !statusDiv) return;
+        
+        const archivo = fileInput.files?.[0];
+        if (!archivo) {
+          statusDiv.textContent = '⚠️ Selecciona una imagen';
+          statusDiv.style.color = '#dc2626';
+          return;
+        }
+
+        if (!imagenesLocacionState.locacionId) {
+          statusDiv.textContent = '⚠️ No hay locación seleccionada';
+          statusDiv.style.color = '#dc2626';
+          return;
+        }
+
+        try {
+          statusDiv.textContent = 'Subiendo...';
+          statusDiv.style.color = '#2d7e3e';
+          
+          const formData = new FormData();
+          formData.append('imagen', archivo);
+          
+          const token = localStorage.getItem('pufab_token');
+          const response = await fetch(`/api/v1/portal/admin/locaciones/${imagenesLocacionState.locacionId}/imagenes`, {
+            method: 'POST',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+            body: formData,
+          });
+          
+          const payload = await response.json();
+          const result = payload?.datos || payload;
+          
+          if (!response.ok || result?.ok === false) {
+            throw new Error(result?.message || `Error ${response.status}: No se pudo subir la imagen`);
+          }
+          
+          statusDiv.textContent = '✓ Imagen subida correctamente';
+          statusDiv.style.color = '#059669';
+          fileInput.value = '';
+          
+          // Recargar lista de imágenes
+          const items = await cargarImagenesLocacion(imagenesLocacionState.locacionId);
+          imagenesLocacionState.items = items;
+          const modalTitulo = document.getElementById('modalImagenesTitulo');
+          if (modalTitulo) {
+            modalTitulo.textContent = `${imagenesLocacionState.locacionNombre} (${items.length}/${MAX_IMAGENES_LOCACION} imágenes)`;
+          }
+          renderListaImagenesLocacion();
+          
+          setTimeout(() => {
+            statusDiv.textContent = '';
+          }, 3000);
+        } catch (error) {
+          statusDiv.textContent = `❌ Error: ${error.message}`;
+          statusDiv.style.color = '#dc2626';
+          console.error('Error subiendo imagen:', error);
+        }
+      }
+
+      const btnSubirImagen = document.getElementById('btnSubirImagenLocacion');
+      if (btnSubirImagen) {
+        btnSubirImagen.addEventListener('click', subirImagenLocacion);
+      }
+
       cerrarModalImagenes?.addEventListener('click', () => {
-        modalImagenesLocacion.style.display = 'none';
+        const modal = document.getElementById('modalImagenesLocacion');
+        if (modal) modal.style.display = 'none';
       });
 
       (async () => {

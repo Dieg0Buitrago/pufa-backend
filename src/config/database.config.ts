@@ -11,11 +11,6 @@ function requireEnv(name: string) {
 // Configuración de conexión a PostgreSQL vía TypeORM
 export default registerAs('database', () => {
   const env = process.env.NODE_ENV ?? process.env.APP_ENV ?? 'development';
-  const database = process.env.DB_DATABASE?.trim() || process.env.DB_NAME?.trim();
-  if (!database) {
-    throw new Error('Falta la variable de entorno requerida: DB_DATABASE o DB_NAME');
-  }
-
   const databaseUrl = process.env.DATABASE_URL?.trim();
 
   if (databaseUrl) {
@@ -30,6 +25,11 @@ export default registerAs('database', () => {
       logging: env === 'development',
       autoLoadEntities: true,
     };
+  }
+
+  const database = process.env.DB_DATABASE?.trim() || process.env.DB_NAME?.trim();
+  if (!database) {
+    throw new Error('Falta la variable de entorno requerida: DB_DATABASE, DB_NAME o DATABASE_URL');
   }
 
   return {

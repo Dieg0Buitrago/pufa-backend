@@ -44,36 +44,94 @@
       <section class="portal-content" id="disponibilidadContent">Cargando agenda...</section>
     </main>
 
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
       const disponibilidadContent = document.getElementById('disponibilidadContent');
+      let agenda = [];
 
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
-      async function init() {
-        const response = await fetch('/api/v1/portal/proveedor/disponibilidad');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
+      const dayOrder = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+      function renderAgenda(items) {
+        agenda = Array.isArray(items) ? items : [];
+        const rows = dayOrder.map((dia) => {
+          const current = agenda.find((item) => item.dia === dia) || { estado: 'Disponible', horas: '08:00 - 18:00' };
+          return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:0.75rem;align-items:center;padding:0.85rem 0;border-bottom:1px solid #e5e7eb;">
+            <strong>${dia}</strong>
+            <span>${current.estado}</span>
+            <span>${current.horas || '-'}</span>
+            <button type="button" class="btn btn-light" data-edit-dia="${dia}">Editar</button>
+          </div>`;
+        }).join('');
 
         disponibilidadContent.innerHTML = `
           <div class="portal-breadcrumb">Panel de Proveedor > Disponibilidad</div>
           <div class="provider-header">
             <div>
-              <h1>Disponibilidad de ${data.nombre}</h1>
-              <p>${data.ciudad}</p>
-              <small>Gestiona tus horarios y bloqueos semanales para recibir nuevas solicitudes.</small>
+              <h1>Disponibilidad de ${window.__providerName || 'tu perfil'}</h1>
+              <p>Gestiona tus horarios y bloqueos semanales para recibir nuevas solicitudes.</p>
+              <small>Lo que actualices aquí se usará como referencia para nuevas solicitudes de servicio.</small>
             </div>
-            <a class="btn btn-primary" href="#">Bloquear Fecha</a>
+            <button class="btn btn-primary" type="button" id="blockDateBtn">Bloquear Fecha</button>
           </div>
 
           <section class="portal-card">
             <h3>Agenda Semanal</h3>
-            <div class="provider-table">
-              ${(data.semana || []).map((row) => `<div><strong>${row.dia}</strong><span>${row.estado}</span><small>${row.horas}</small></div>`).join('')}
-            </div>
+            <div class="provider-table">${rows}</div>
           </section>
         `;
+
+        disponibilidadContent.querySelectorAll('[data-edit-dia]').forEach((button) => {
+          button.addEventListener('click', () => editarDia(button.getAttribute('data-edit-dia')));
+        });
+
+        document.getElementById('blockDateBtn')?.addEventListener('click', bloquearFecha);
+      }
+
+      async function editarDia(dia) {
+        const estado = prompt(`Estado para ${dia} (Disponible, Reservado, Bloqueado)`, 'Disponible');
+        if (!estado) return;
+        const horas = prompt(`Horario o nota para ${dia}`, '08:00 - 18:00');
+        if (!horas) return;
+
+        try {
+          await API_CLIENT.portal.proveedor.guardarDisponibilidad(dia, estado, horas);
+          await init();
+        } catch (error) {
+          alert(error?.message || 'No se pudo guardar la disponibilidad.');
+        }
+      }
+
+      function bloquearFecha() {
+        const fecha = prompt('Fecha a bloquear (YYYY-MM-DD)');
+        if (!fecha) return;
+        const notas = prompt('Motivo o detalle del bloqueo', 'No disponible por agenda de rodaje');
+        const bloqueos = JSON.parse(localStorage.getItem('pufab_provider_bloqueos') || '[]');
+        bloqueos.unshift({ fecha, notas, creado_en: new Date().toISOString() });
+        localStorage.setItem('pufab_provider_bloqueos', JSON.stringify(bloqueos.slice(0, 12)));
+        alert(`Fecha bloqueada: ${fecha}`);
+        init();
+      }
+
+      async function init() {
+        try {
+          const data = await API_CLIENT.portal.proveedor.disponibilidad();
+          window.__providerName = data.nombre;
+          renderAgenda(data.semana || []);
+
+          const bloqueos = JSON.parse(localStorage.getItem('pufab_provider_bloqueos') || '[]');
+          if (bloqueos.length) {
+            const bloqueosHtml = bloqueos
+              .map((item) => `<div class="portal-permit"><div><small>${item.fecha}</small><strong>Fecha bloqueada</strong><span>${item.notas || 'Sin nota'}</span></div></div>`)
+              .join('');
+            disponibilidadContent.insertAdjacentHTML('beforeend', `<section class="portal-card"><h3>Bloqueos recientes</h3>${bloqueosHtml}</section>`);
+          }
+        } catch (error) {
+          disponibilidadContent.innerHTML = `<article class="portal-card"><h1>No fue posible cargar la disponibilidad</h1><p>${error?.message || 'Intenta de nuevo más tarde.'}</p></article>`;
+        }
       }
 
       init();

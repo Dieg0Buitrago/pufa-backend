@@ -24,6 +24,7 @@
       <section class="portal-content" id="recursosContent">Cargando recursos...</section>
     </main>
 
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
@@ -31,21 +32,23 @@
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
       async function init() {
-        const response = await fetch('/api/v1/portal/academico/recursos');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
+        try {
+          const data = await API_CLIENT.portal.academico.recursos();
 
-        const cards = [
-          { titulo: 'Documentos Legales', descripcion: data.documentos?.descripcion, total: data.documentos?.total, cta: 'Ver Documentos' },
-          { titulo: 'Tutoriales en Video', descripcion: data.tutoriales?.descripcion, total: data.tutoriales?.total, cta: 'Ver Tutoriales' },
-          { titulo: 'Estadísticas', descripcion: data.estadisticas?.descripcion, total: data.estadisticas?.total, cta: 'Ver Estadísticas' },
-        ];
+          const cards = [
+            { titulo: 'Documentos Legales', descripcion: data.documentos?.descripcion, total: data.documentos?.total, cta: 'Ver Documentos', href: '/academico/academico-2.html' },
+            { titulo: 'Tutoriales en Video', descripcion: data.tutoriales?.descripcion, total: data.tutoriales?.total, cta: 'Ver Tutoriales', href: '/academico/academico-3.html' },
+            { titulo: 'Estadísticas', descripcion: data.estadisticas?.descripcion, total: data.estadisticas?.total, cta: 'Ver Estadísticas', href: '/academico/academico-2.html' },
+          ];
 
-        recursosContent.innerHTML = `
+          recursosContent.innerHTML = `
           <div class="portal-breadcrumb">Portal Académico > Recursos</div>
           <h1>Recursos y Biblioteca</h1>
-          <div class="academico-resource-grid">${cards.map((item) => `<article class="portal-card"><h3>${item.titulo}</h3><p>${item.descripcion}</p><small>${item.total} registros</small><a href="#">${item.cta}</a></article>`).join('')}</div>
+          <div class="academico-resource-grid">${cards.map((item) => `<article class="portal-card"><h3>${item.titulo}</h3><p>${item.descripcion}</p><small>${item.total} registros</small><a href="${item.href}">${item.cta}</a></article>`).join('')}</div>
         `;
+        } catch (error) {
+          recursosContent.innerHTML = `<article class="portal-card"><h1>No fue posible cargar los recursos</h1><p>${error?.message || 'Intenta de nuevo más tarde.'}</p></article>`;
+        }
       }
 
       init();

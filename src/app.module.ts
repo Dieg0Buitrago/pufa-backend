@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import * as path from 'path';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { AppController } from './app.controller';
@@ -21,6 +22,7 @@ import { EntidadesModule } from './modules/entidades/entidades.module';
     // Configuración global con variables de entorno
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [path.resolve(process.cwd(), '.env')],
       load: [appConfig, databaseConfig],
     }),
     // Conexión a PostgreSQL con TypeORM
@@ -36,6 +38,8 @@ import { EntidadesModule } from './modules/entidades/entidades.module';
         autoLoadEntities: true,
         synchronize: configService.get('database.synchronize'),
         logging: configService.get('database.logging'),
+        retryAttempts: 1,
+        retryDelay: 0,
       }),
       inject: [ConfigService],
     }),

@@ -1,12 +1,20 @@
 import {
   Controller, Get, Post, Patch, Param, Body,
-  Query, ParseIntPipe, UseGuards,
+  Query, ParseIntPipe, UseGuards, UseInterceptors, UploadedFiles,
+  Res,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import type { Response } from 'express';
+import PDFDocument from 'pdfkit';
 import {
   ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
-  ApiParam, ApiQuery, ApiBody,
+  ApiParam, ApiQuery, ApiBody, ApiConsumes,
 } from '@nestjs/swagger';
 import { TramitesService } from './tramites.service';
+import { DocumentosService } from '../documentos/documentos.service';
+import { Documento } from '../documentos/entities/documento.entity';
 import { CrearTramiteDto } from './dto/crear-tramite.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -18,7 +26,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tramites')
 export class TramitesController {
-  constructor(private readonly tramitesService: TramitesService) {}
+  constructor(
+    private readonly tramitesService: TramitesService,
+    private readonly documentosService: DocumentosService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar trámites', description: 'Solicitante ve sus propios trámites. Admin y revisor ven todos.' })
@@ -61,6 +72,106 @@ export class TramitesController {
     @Body() dto: CrearTramiteDto,
   ) {
     return this.tramitesService.crear(usuarioId, dto);
+  }
+
+  @Post(':id/documentos')
+  @ApiOperation({
+    summary: 'Subir documentos a un trámite',
+    description: 'Carga múltiples archivos a un trámite. Máximo 10 MB por archivo.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', description: 'ID del trámite' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        archivos: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Archivos a subir (máx. 10 MB cada uno)',
+        },
+      },
+      required: ['archivos'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Documentos cargados exitosamente.' })
+  @UseInterceptors(
+    FilesInterceptor('archivos', 10, {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const nombre = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
+          cb(null, nombre);
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  async subirDocumentos(
+    @Param('id', ParseIntPipe) tramiteId: number,
+    @CurrentUser('id') usuarioId: number,
+    @UploadedFiles() archivos: Express.Multer.File[],
+  ) {
+    const resultados: Documento[] = [];
+    for (const archivo of archivos || []) {
+      const doc = await this.documentosService.registrarDocumento(
+        usuarioId, archivo, undefined, tramiteId,
+      );
+      resultados.push(doc);
+    }
+    return { mensaje: `${resultados.length} documentos cargados exitosamente`, documentos: resultados };
+  }
+
+  @Get(':id/recibo-banco')
+  @ApiOperation({
+    summary: 'Generar recibo bancario del trámite',
+    description: 'Genera un PDF de referencia para pago en banco con los datos del trámite.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del trámite' })
+  @ApiResponse({ status: 200, description: 'PDF del recibo generado.' })
+  async reciboBanco(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') usuarioId: number,
+    @CurrentUser('roles') roles: string[],
+    @Res() res: Response,
+  ) {
+    const tramite = await this.tramitesService.obtenerPorId(id, usuarioId, roles);
+    const valor = Number(tramite.valor_abono_requerido || 0);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 36 });
+    const chunks: Buffer[] = [];
+
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=recibo-tramite-${id}.pdf`);
+      res.send(buffer);
+    });
+
+    doc.rect(36, 36, 522, 110).fill('#f7f7f9');
+    doc.fillColor('#0b3d91').fontSize(16).text('RECIBO DE REFERENCIA DE PAGO', 48, 50);
+    doc.fillColor('#111827').fontSize(10).text(`Trámite: ${tramite.numero_radicado || tramite.id}`, 48, 76);
+    doc.fontSize(10).text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CO')}`, 48, 92);
+    doc.text(`Proyecto: ${tramite.proyecto?.nombre_proyecto || 'N/A'}`, 48, 108);
+
+    const startY = 160;
+    doc.moveTo(36, startY - 8).lineTo(558, startY - 8).stroke('#e5e7eb');
+    doc.fontSize(12).fillColor('#111827').text('Datos para validación', 48, startY);
+    doc.fontSize(10).fillColor('#374151');
+    doc.text(`Solicitante: ${tramite.usuario_solicitante?.email || 'N/A'}`, 48, startY + 22);
+    doc.text(`Municipio principal: ${tramite.proyecto?.municipio_principal?.nombre || 'N/A'}`, 48, startY + 38);
+    doc.text(`Estado actual: ${tramite.estado_tramite?.nombre || 'Pendiente'}`, 48, startY + 54);
+    doc.fontSize(14).fillColor('#0b3d91').text(`Valor de referencia: $${valor.toLocaleString('es-CO')}`, 48, startY + 86);
+
+    doc.fontSize(10).fillColor('#6b7280').text(
+      'Este documento es una referencia para validar la solicitud y realizar el pago en banco. No reemplaza el comprobante oficial de pago.',
+      48,
+      420,
+      { width: 480 },
+    );
+
+    doc.end();
   }
 
   @Roles('admin', 'revisor')

@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
 import { SolicitudRegistro } from './entities/solicitud-registro.entity';
 import { HistorialSolicitudRegistro } from './entities/historial-solicitud-registro.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -8,6 +10,8 @@ import { EstadoCuenta } from '../catalogos/entities/estado-cuenta.entity';
 
 @Injectable()
 export class RegistroService {
+  private readonly logger = new Logger(RegistroService.name);
+
   constructor(
     @InjectRepository(SolicitudRegistro)
     private solicitudesRepo: Repository<SolicitudRegistro>,
@@ -17,6 +21,7 @@ export class RegistroService {
     private usuariosRepo: Repository<Usuario>,
     @InjectRepository(EstadoCuenta)
     private estadosCuentaRepo: Repository<EstadoCuenta>,
+    private configService: ConfigService,
   ) {}
 
   // Crea solicitud de registro para el usuario autenticado
@@ -37,6 +42,8 @@ export class RegistroService {
     await this.registrarHistorial(
       guardada.id, undefined, 'pendiente', usuarioId, 'ENVIO_SOLICITUD', 'Solicitud enviada por el usuario',
     );
+
+    await this.enviarNotificacionSolicitudRegistro(usuarioId, guardada.id);
 
     return guardada;
   }
@@ -115,5 +122,67 @@ export class RegistroService {
       observacion,
     });
     await this.historialRepo.save(entrada);
+  }
+
+  private async enviarNotificacionSolicitudRegistro(usuarioId: number, solicitudId: number) {
+    const smtpHost = this.configService.get<string>('app.smtpHost');
+    const smtpPort = this.configService.get<number>('app.smtpPort', 587);
+    const smtpSecure = this.configService.get<boolean>('app.smtpSecure', false);
+    const smtpUser = this.configService.get<string>('app.smtpUser');
+    const smtpPass = this.configService.get<string>('app.smtpPass');
+    const smtpFrom = this.configService.get<string>('app.smtpFrom');
+    const smtpAdminTo = this.configService.get<string>('app.smtpAdminTo');
+
+    if (!smtpHost || !smtpFrom || !smtpUser || !smtpPass) {
+      return;
+    }
+
+    try {
+      const usuario = await this.usuariosRepo.findOne({ where: { id: usuarioId } });
+      if (!usuario?.email) {
+        return;
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      const asunto = `PUFAB: tu registro fue enviado para revisión (#${solicitudId})`;
+      const htmlUsuario = `
+        <h2>Tu registro fue enviado para revisión</h2>
+        <p>Hemos recibido tu solicitud y ya quedó en cola para validación.</p>
+        <p><strong>Solicitud:</strong> #${solicitudId}</p>
+        <p>Te avisaremos cuando cambie de estado.</p>
+      `;
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: usuario.email,
+        subject: asunto,
+        html: htmlUsuario,
+      });
+
+      if (smtpAdminTo && smtpAdminTo !== usuario.email) {
+        await transporter.sendMail({
+          from: smtpFrom,
+          to: smtpAdminTo,
+          subject: `PUFAB: nueva solicitud de registro pendiente (#${solicitudId})`,
+          html: `
+            <h2>Nueva solicitud de registro pendiente</h2>
+            <p>Un usuario envió una solicitud que requiere revisión.</p>
+            <p><strong>Solicitud:</strong> #${solicitudId}</p>
+            <p><strong>Correo del solicitante:</strong> ${usuario.email}</p>
+          `,
+        });
+      }
+    } catch (error: any) {
+      this.logger.warn(`No se pudo enviar correo de notificación de registro #${solicitudId}: ${error?.message ?? error}`);
+    }
   }
 }

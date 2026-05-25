@@ -93,11 +93,7 @@ async function run() {
     ok('Archivo .env encontrado');
     dotenv.config({ path: envPath });
   } else {
-    warn('No se encontró .env. Se usarán valores por defecto o de entorno global.');
-    const envExamplePath = path.join(projectRoot, '.env.example');
-    if (fs.existsSync(envExamplePath)) {
-      info('Puedes crear .env a partir de .env.example');
-    }
+    warn('No se encontró .env. Crea este archivo antes de iniciar el backend.');
   }
 
   const appPort = parsePort(process.env.PORT ?? process.env.APP_PORT, 3000);
@@ -109,12 +105,18 @@ async function run() {
   }
 
   const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST,
     port: parsePort(process.env.DB_PORT, 5432),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_DATABASE || process.env.DB_NAME || 'pufa_db',
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE || process.env.DB_NAME,
   };
+
+  if (!dbConfig.host || !dbConfig.username || !dbConfig.database) {
+    fail('Faltan variables de entorno de base de datos en .env: DB_HOST, DB_USERNAME y DB_DATABASE o DB_NAME.');
+    process.exitCode = 1;
+    return;
+  }
 
   info(`Probando PostgreSQL en ${dbConfig.host}:${dbConfig.port}/${dbConfig.database} ...`);
   const dbResult = await checkDatabaseConnection(dbConfig);

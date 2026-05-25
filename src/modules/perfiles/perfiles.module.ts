@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PerfilesController } from './perfiles.controller';
+import { AdminController } from './admin.controller';
 import { PerfilesService } from './perfiles.service';
 import { PerfilProveedor } from './entities/perfil-proveedor.entity';
 import { PerfilProductora } from './entities/perfil-productora.entity';
@@ -24,7 +25,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
       Usuario,
     ]),
   ],
-  controllers: [PerfilesController],
+  controllers: [PerfilesController, AdminController],
   providers: [PerfilesService],
   exports: [PerfilesService, TypeOrmModule],
 })

@@ -44,21 +44,72 @@
       <section class="portal-content" id="proveedorPanel">Cargando perfil...</section>
     </main>
 
+    <div id="editProfileModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1200; align-items:center; justify-content:center;">
+      <div style="background:#fff; width:min(640px,92%); border-radius:14px; padding:1.25rem; box-shadow:0 18px 48px rgba(0,0,0,.25);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
+          <h3 style="margin:0;">Editar perfil de proveedor</h3>
+          <button type="button" id="closeEditProfile" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <form id="editProfileForm" style="display:grid; gap:0.9rem;">
+          <label style="display:grid; gap:0.35rem; font-size:14px;">Descripción del perfil
+            <textarea id="profileDescripcion" rows="4" style="padding:0.75rem;border:1px solid #d1d5db;border-radius:10px;resize:vertical;"></textarea>
+          </label>
+          <label style="display:grid; gap:0.35rem; font-size:14px;">Sitio web
+            <input id="profileSitioWeb" type="url" placeholder="https://" style="padding:0.75rem;border:1px solid #d1d5db;border-radius:10px;" />
+          </label>
+          <label style="display:grid; gap:0.35rem; font-size:14px;">Teléfono
+            <input id="profileTelefono" type="tel" placeholder="3000000000" style="padding:0.75rem;border:1px solid #d1d5db;border-radius:10px;" />
+          </label>
+          <label style="display:flex; gap:0.6rem; align-items:center; font-size:14px;">
+            <input id="profileVisibleDirectorio" type="checkbox" checked />
+            Mostrar en el directorio público
+          </label>
+          <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+            <button type="button" id="cancelEditProfile" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
       const proveedorPanel = document.getElementById('proveedorPanel');
+      const editProfileModal = document.getElementById('editProfileModal');
+      const editProfileForm = document.getElementById('editProfileForm');
+      const closeEditProfile = document.getElementById('closeEditProfile');
+      const cancelEditProfile = document.getElementById('cancelEditProfile');
+      const profileDescripcion = document.getElementById('profileDescripcion');
+      const profileSitioWeb = document.getElementById('profileSitioWeb');
+      const profileTelefono = document.getElementById('profileTelefono');
+      const profileVisibleDirectorio = document.getElementById('profileVisibleDirectorio');
+      let currentProfile = null;
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
       function money(value) {
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
       }
 
+      function openEditProfile() {
+        if (!currentProfile) return;
+        profileDescripcion.value = currentProfile.descripcion || '';
+        profileSitioWeb.value = currentProfile.contacto?.sitio_web || '';
+        profileTelefono.value = currentProfile.contacto?.telefono || '';
+        profileVisibleDirectorio.checked = true;
+        editProfileModal.style.display = 'flex';
+      }
+
+      function closeProfileModal() {
+        editProfileModal.style.display = 'none';
+      }
+
       async function bootstrap() {
-        const response = await fetch('/api/v1/portal/proveedor/panel');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
-        proveedorPanel.innerHTML = `
+        try {
+          const data = await API_CLIENT.portal.proveedor.panel();
+          currentProfile = data;
+          proveedorPanel.innerHTML = `
           <div class="portal-breadcrumb">Panel de Proveedor > Mi Panel</div>
           <div class="provider-header">
             <div>
@@ -66,7 +117,7 @@
               <p>${data.rol} · ${data.ciudad} · ${data.rating} (${data.resenas} reseñas)</p>
               <small>${data.descripcion}</small>
             </div>
-            <a class="btn btn-primary" href="#">Editar Perfil</a>
+            <button class="btn btn-primary" type="button" id="editProfileBtn">Editar Perfil</button>
           </div>
 
           <div class="portal-metrics">
@@ -86,7 +137,42 @@
             ${data.solicitudes.map((r) => `<div class="portal-permit"><div><small>${r.codigo} · ${r.estado}</small><strong>${r.proyecto}</strong><span>${r.cliente} · ${r.fecha} · ${r.dias} días</span></div><strong>${money(r.valor)}</strong></div>`).join('')}
           </section>
         `;
+
+          document.getElementById('editProfileBtn')?.addEventListener('click', openEditProfile);
+        } catch (error) {
+          proveedorPanel.innerHTML = `
+            <div class="portal-breadcrumb">Panel de Proveedor > Mi Panel</div>
+            <article class="portal-card">
+              <h1>No fue posible cargar tu perfil</h1>
+              <p>${error?.message || 'Revisa tu sesión o vuelve a intentarlo.'}</p>
+              <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                <a class="btn btn-primary" href="/iniciar-sesion/">Volver a iniciar sesión</a>
+                <a class="btn btn-ghost" href="/contacto/">Contactar soporte</a>
+              </div>
+            </article>
+          `;
+        }
       }
+
+      editProfileForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        try {
+          await API_CLIENT.perfiles.editarProveedor({
+            descripcion_perfil: profileDescripcion.value.trim(),
+            sitio_web: profileSitioWeb.value.trim(),
+            telefono: profileTelefono.value.trim(),
+            visible_directorio: profileVisibleDirectorio.checked,
+          });
+          closeProfileModal();
+          await bootstrap();
+          alert('Perfil actualizado correctamente.');
+        } catch (error) {
+          alert(error?.message || 'No fue posible actualizar el perfil.');
+        }
+      });
+
+      closeEditProfile?.addEventListener('click', closeProfileModal);
+      cancelEditProfile?.addEventListener('click', closeProfileModal);
 
       bootstrap();
     </script>

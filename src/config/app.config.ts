@@ -13,4 +13,11 @@ export default registerAs('app', () => ({
   diasHabilesMin: parseInt(process.env.DIAS_HABILES_MIN ?? '5', 10),
   diasHabilesMax: parseInt(process.env.DIAS_HABILES_MAX ?? '15', 10),
   jwtExpiracion: process.env.JWT_EXPIRES_IN ?? process.env.JWT_EXPIRATION ?? '1d',
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: parseInt(process.env.SMTP_PORT ?? '587', 10),
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
+  smtpFrom: process.env.SMTP_FROM,
+  smtpAdminTo: process.env.SMTP_ADMIN_TO,
 }));

@@ -79,4 +79,12 @@ export class PagosService {
       relations: ['estado_abono', 'pago'],
     });
   }
+
+  // Obtiene un pago por su ID
+  async obtenerPorId(pagoId: number) {
+    return this.pagosRepo.findOne({
+      where: { id: pagoId },
+      relations: ['tipo_pago', 'estado_pago'],
+    });
+  }
 }

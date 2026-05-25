@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import { Response } from 'express';
+import { createReadStream } from 'fs';
 import { Documento } from './entities/documento.entity';
 
 @Injectable()
@@ -20,6 +22,7 @@ export class DocumentosService {
     archivo: Express.Multer.File,
     tipoDocumentoId?: number,
     tramiteId?: number,
+    proyectoId?: number,
     solicitudRegistroId?: number,
   ) {
     // Calcula hash SHA256 para verificar integridad del archivo
@@ -32,6 +35,7 @@ export class DocumentosService {
         usuario_id: usuarioId,
         tipo_documento_id: tipoDocumentoId,
         tramite_id: tramiteId,
+        proyecto_id: proyectoId,
         activo: true,
       },
     });
@@ -39,6 +43,7 @@ export class DocumentosService {
     const documento = this.documentosRepo.create({
       usuario_id: usuarioId,
       tramite_id: tramiteId,
+      proyecto_id: proyectoId,
       solicitud_registro_id: solicitudRegistroId,
       tipo_documento_id: tipoDocumentoId,
       version: versionActual + 1,
@@ -63,6 +68,15 @@ export class DocumentosService {
     });
   }
 
+  // Lista documentos de un proyecto
+  async listarPorProyecto(proyectoId: number) {
+    return this.documentosRepo.find({
+      where: { proyecto_id: proyectoId, activo: true },
+      relations: ['tipo_documento'],
+      order: { fecha_subida: 'DESC' },
+    });
+  }
+
   // Valida o rechaza un documento (admin)
   async validarDocumento(
     documentoId: number,
@@ -81,5 +95,22 @@ export class DocumentosService {
     });
 
     return { mensaje: `Documento ${estadoValidacion} exitosamente` };
+  }
+
+  // Descarga un documento
+  async descargarDocumento(documentoId: number, res: Response) {
+    const documento = await this.documentosRepo.findOne({ where: { id: documentoId, activo: true } });
+    if (!documento) throw new NotFoundException('Documento no encontrado');
+
+    const filePath = documento.ruta_archivo;
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Archivo no encontrado en servidor');
+    }
+
+    res.setHeader('Content-Type', documento.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${documento.nombre_original}"`);
+
+    const stream = createReadStream(filePath);
+    stream.pipe(res);
   }
 }

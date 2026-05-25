@@ -23,6 +23,7 @@
       <section class="portal-content" id="observatorioContent">Cargando observatorio...</section>
     </main>
 
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
@@ -34,11 +35,10 @@
       }
 
       async function init() {
-        const response = await fetch('/api/v1/portal/academico/observatorio');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
+        try {
+          const data = await API_CLIENT.portal.academico.observatorio();
 
-        observatorioContent.innerHTML = `
+          observatorioContent.innerHTML = `
           <div class="portal-breadcrumb">Portal Académico > Observatorio</div>
           <h1>Observatorio Cinematográfico</h1>
 
@@ -70,6 +70,9 @@
             <div class="academico-list">${(data.documentos || []).map((doc) => `<div><strong>${doc.titulo}</strong><span>${doc.tipo}</span></div>`).join('')}</div>
           </section>
         `;
+        } catch (error) {
+          observatorioContent.innerHTML = `<article class="portal-card"><h1>No fue posible cargar el observatorio</h1><p>${error?.message || 'Intenta de nuevo más tarde.'}</p></article>`;
+        }
       }
 
       init();

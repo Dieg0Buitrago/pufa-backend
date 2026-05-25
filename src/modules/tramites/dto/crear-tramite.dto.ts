@@ -5,6 +5,21 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CrearTramiteLocacionDto {
+  @ApiPropertyOptional({ example: 'manual-1', description: 'Identificador único de la locación seleccionada en el menú' })
+  @IsOptional()
+  @IsString()
+  id_unico?: string;
+
+  @ApiPropertyOptional({ example: 'manual', description: 'Origen de la locación: manual o tramite' })
+  @IsOptional()
+  @IsString()
+  origen_tipo?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID de la locación de origen' })
+  @IsOptional()
+  @IsNumber()
+  origen_id?: number;
+
   @ApiPropertyOptional({ example: 1, description: 'ID del municipio (ver /catalogos/municipios)' })
   @IsOptional()
   @IsNumber()

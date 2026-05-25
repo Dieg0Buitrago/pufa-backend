@@ -40,6 +40,56 @@ export class CatalogosController {
   tiposIdentificacion() { return this.catalogosService.obtenerTiposIdentificacion(); }
 
   @Public()
+  @Get('tipos-entidad')
+  @ApiOperation({ summary: 'Tipos de entidad jurídica' })
+  tiposEntidad() { return this.catalogosService.obtenerTiposEntidad(); }
+
+  @Public()
+  @Get('grupos-etnicos')
+  @ApiOperation({ summary: 'Grupos étnicos' })
+  gruposEtnicos() { return this.catalogosService.obtenerGruposEtnicos(); }
+
+  @Public()
+  @Get('sexos-nacer')
+  @ApiOperation({ summary: 'Sexos al nacer' })
+  sexosNacer() { return this.catalogosService.obtenerSexosNacer(); }
+
+  @Public()
+  @Get('tipos-discapacidad')
+  @ApiOperation({ summary: 'Tipos de discapacidad' })
+  tiposDiscapacidad() { return this.catalogosService.obtenerTiposDiscapacidad(); }
+
+  @Public()
+  @Get('tiempos-dedicacion-sector')
+  @ApiOperation({ summary: 'Tiempos de dedicación al sector' })
+  tiemposDedicacionSector() { return this.catalogosService.obtenerTiemposDedicacionSector(); }
+
+  @Public()
+  @Get('tipos-ingresos-sector')
+  @ApiOperation({ summary: 'Tipos de ingresos provenientes del sector' })
+  tiposIngresosSector() { return this.catalogosService.obtenerTiposIngresosSector(); }
+
+  @Public()
+  @Get('tipos-propiedad-equipos')
+  @ApiOperation({ summary: 'Tipos de propiedad de equipos' })
+  tiposPropiedadEquipos() { return this.catalogosService.obtenerTiposPropiedadEquipos(); }
+
+  @Public()
+  @Get('gamas-equipos')
+  @ApiOperation({ summary: 'Gamas de equipos' })
+  gamasEquipos() { return this.catalogosService.obtenerGamasEquipos(); }
+
+  @Public()
+  @Get('rangos-experiencia-sector')
+  @ApiOperation({ summary: 'Rangos de experiencia en el sector' })
+  rangosExperienciaSector() { return this.catalogosService.obtenerRangosExperienciaSector(); }
+
+  @Public()
+  @Get('tipos-produccion-participa')
+  @ApiOperation({ summary: 'Tipos de producción en los que participa' })
+  tiposProduccionParticipa() { return this.catalogosService.obtenerTiposProduccionParticipa(); }
+
+  @Public()
   @Get('identidades-genero')
   @ApiOperation({ summary: 'Opciones de identidad de género' })
   identidadesGenero() { return this.catalogosService.obtenerIdentidadesGenero(); }

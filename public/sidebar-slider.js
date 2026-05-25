@@ -104,6 +104,99 @@
     });
   }
 
+  function resolveAdminReportSection() {
+    const path = normalizeRoute(`${window.location.pathname}${window.location.search}`).split('?')[0];
+    const map = {
+      '/admin/admin-2.html': 'usuarios',
+      '/admin/admin-3.html': 'verificacion',
+      '/admin/admin-4.html': 'locaciones',
+      '/admin/admin-5.html': 'permisos',
+      '/admin/admin-6.html': 'comites',
+      '/admin/admin-7.html': 'finanzas',
+      '/admin/admin-8.html': 'kpis',
+      '/admin/admin-9.html': 'comunicaciones',
+      '/admin': 'usuarios',
+      '/admin/': 'usuarios',
+    };
+    return map[path] || null;
+  }
+
+  async function exportPortalContentAsPdf() {
+    const section = resolveAdminReportSection();
+    if (!section) {
+      alert('Esta página no tiene una sección de reporte PDF configurada.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/reportes/admin/${section}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parametros: {
+            ruta: window.location.pathname,
+            fecha: new Date().toISOString(),
+          },
+        }),
+      });
+
+      const payload = await response.json();
+      const result = payload?.datos || payload;
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || 'No se pudo generar el PDF.');
+      }
+
+      const fileUrl = result?.data?.archivo_url;
+      if (!fileUrl) {
+        throw new Error('No se recibió la URL del archivo PDF.');
+      }
+
+      const downloadLink = document.createElement('a');
+      downloadLink.href = fileUrl;
+      downloadLink.target = '_blank';
+      downloadLink.rel = 'noopener noreferrer';
+      downloadLink.click();
+    } catch (error) {
+      alert(error?.message || 'Error generando el PDF.');
+    }
+  }
+
+  function ensurePdfExportButton() {
+    const portalContent = document.querySelector('.portal-content');
+    if (!portalContent) return;
+    if (!resolveAdminReportSection()) return;
+
+    if (portalContent.querySelector('[data-export-pdf-btn]')) return;
+
+    const headerRow = portalContent.querySelector('.portal-head-row');
+    if (headerRow) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-secondary';
+      button.textContent = 'Generar PDF';
+      button.setAttribute('data-export-pdf-btn', '1');
+      button.addEventListener('click', exportPortalContentAsPdf);
+      headerRow.appendChild(button);
+      return;
+    }
+
+    const fallbackWrap = document.createElement('div');
+    fallbackWrap.style.display = 'flex';
+    fallbackWrap.style.justifyContent = 'flex-end';
+    fallbackWrap.style.marginBottom = '12px';
+
+    const fallbackButton = document.createElement('button');
+    fallbackButton.type = 'button';
+    fallbackButton.className = 'btn btn-secondary';
+    fallbackButton.textContent = 'Generar PDF';
+    fallbackButton.setAttribute('data-export-pdf-btn', '1');
+    fallbackButton.addEventListener('click', exportPortalContentAsPdf);
+
+    fallbackWrap.appendChild(fallbackButton);
+    portalContent.insertBefore(fallbackWrap, portalContent.firstChild);
+  }
+
   async function navigateTo(href, options) {
     const opts = {
       pushHistory: false,
@@ -206,6 +299,8 @@
     const links = Array.from(sidebar.querySelectorAll('.portal-link'));
     if (!links.length) return;
 
+    ensurePdfExportButton();
+
     function updateSliderPosition() {
       const activeLink = sidebar.querySelector('.portal-link.active');
       if (!activeLink) return;
@@ -264,6 +359,8 @@
   }
 
   window.initSidebarSlider = initSidebarSlider;
+
+  window.exportPortalContentAsPdf = exportPortalContentAsPdf;
 
   const startupKey = normalizeRoute(`${window.location.pathname}${window.location.search}`);
   const startupPayload = extractViewPayload(document);

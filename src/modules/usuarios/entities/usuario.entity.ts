@@ -20,6 +20,12 @@ export class Usuario {
   @Column({ length: 30, nullable: true })
   telefono: string;
 
+  @Column({ type: 'text', nullable: true })
+  avatar_url: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio: string;
+
   @Column({ length: 255 })
   password_hash: string;
 

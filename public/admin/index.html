@@ -17,7 +17,7 @@
         <a class="portal-link active" href="/admin/">Resumen</a>
         <a class="portal-link" href="/admin/admin-2.html">Usuarios y Accesos</a>
         <a class="portal-link" href="/admin/admin-3.html">Verificación de Perfiles</a>
-        <a class="portal-link" href="/admin/admin-4.html">Gestión de Activos</a>
+        <a class="portal-link" href="/admin/admin-4.html">Gestión de Locaciones</a>
         <a class="portal-link" href="/admin/admin-5.html">Flujo de Permisos</a>
         <a class="portal-link" href="/admin/admin-6.html">Comités Técnicos</a>
         <a class="portal-link" href="/admin/admin-7.html">Finanzas y Reservas</a>
@@ -58,6 +58,10 @@
             <section class="portal-card">
               <h3>Acciones Rápidas</h3>
               <div class="admin-actions">${(data.acciones || []).map((item) => `<div><strong>${item.titulo}</strong><span>${item.detalle}</span></div>`).join('')}</div>
+              <div class="permit-actions" style="margin-top: 1rem;">
+                <a class="btn btn-primary" href="/crear-proyecto/">Crear Proyecto</a>
+                <a class="btn btn-light" href="/crear-tramite/">Crear Tramite</a>
+              </div>
             </section>
             <section class="portal-card">
               <h3>Notificaciones Recientes</h3>

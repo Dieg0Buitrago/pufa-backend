@@ -12,7 +12,7 @@
         <a class="portal-link" href="/admin/">Resumen</a>
         <a class="portal-link" href="/admin/admin-2.html">Usuarios y Accesos</a>
         <a class="portal-link" href="/admin/admin-3.html">Verificación de Perfiles</a>
-        <a class="portal-link" href="/admin/admin-4.html">Gestión de Activos</a>
+        <a class="portal-link" href="/admin/admin-4.html">Gestión de Locaciones</a>
         <a class="portal-link" href="/admin/admin-5.html">Flujo de Permisos</a>
         <a class="portal-link" href="/admin/admin-6.html">Comités Técnicos</a>
         <a class="portal-link" href="/admin/admin-7.html">Finanzas y Reservas</a>
@@ -22,7 +22,7 @@
 
       <section class="portal-content">
         <div class="portal-breadcrumb">Panel Administrativo > Comunicaciones</div>
-        <div class="portal-head-row"><h1>Centro de Comunicaciones</h1><a class="btn btn-primary" href="#">Guardar</a></div>
+        <div class="portal-head-row"><h1>Centro de Comunicaciones</h1><span style="color: green; font-size: 14px;">✓ Se guarda automáticamente</span></div>
         <section class="portal-card"><h3>Configuración de Notificaciones</h3><div class="admin-notif-list" id="notifList">Cargando configuración...</div></section>
       </section>
     </main>
@@ -31,22 +31,42 @@
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
       const notifList = document.getElementById('notifList');
+      
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
       async function load() {
-        const response = await fetch('/api/v1/portal/admin/comunicaciones');
-        const payload = await response.json();
-        const data = payload?.datos?.data || payload?.data || [];
+        try {
+          const response = await fetch('/api/v1/portal/admin/comunicaciones');
+          const payload = await response.json();
+          const data = payload?.datos?.data || payload?.data || [];
 
-        notifList.innerHTML = data.length
-          ? data.map((n) => `<article><span>${n.nombre}</span><label class="switch"><input type="checkbox" ${n.activo ? 'checked' : ''} data-id="${n.id}" /><i></i></label></article>`).join('')
-          : '<p>Sin configuraciones.</p>';
+          notifList.innerHTML = data.length
+            ? data.map((n) => `<article><span>${n.nombre}</span><label class="switch"><input type="checkbox" ${n.activo ? 'checked' : ''} data-id="${n.id}" data-nombre="${n.nombre}" /><i></i></label></article>`).join('')
+            : '<p>Sin configuraciones disponibles.</p>';
 
-        notifList.querySelectorAll('input[data-id]').forEach((input) => {
-          input.addEventListener('change', async () => {
-            await fetch(`/api/v1/portal/admin/comunicaciones/${input.getAttribute('data-id')}/toggle`, { method: 'POST' });
+          notifList.querySelectorAll('input[data-id]').forEach((input) => {
+            input.addEventListener('change', async () => {
+              const id = input.getAttribute('data-id');
+              const nombre = input.getAttribute('data-nombre');
+              const estado = input.checked ? 'activado' : 'desactivado';
+              
+              try {
+                const res = await fetch(`/api/v1/portal/admin/comunicaciones/${id}/toggle`, { method: 'POST' });
+                if (res.ok) {
+                  console.log(`✓ Notificación "${nombre}" ${estado}`);
+                } else {
+                  input.checked = !input.checked; // Revertir si hay error
+                  alert('Error al cambiar la configuración');
+                }
+              } catch (error) {
+                input.checked = !input.checked;
+                alert('Error: ' + error.message);
+              }
+            });
           });
-        });
+        } catch (error) {
+          notifList.innerHTML = `<p style="color: red;">Error cargando configuraciones: ${error.message}</p>`;
+        }
       }
 
       load();

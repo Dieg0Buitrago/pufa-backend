@@ -44,36 +44,54 @@
       <section class="portal-content" id="mensajesContent">Cargando mensajes...</section>
     </main>
 
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
       const mensajesContent = document.getElementById('mensajesContent');
+      let mensajesActuales = [];
 
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
+      function abrirNuevoMensaje() {
+        const titulo = prompt('Título del mensaje', 'Consulta de disponibilidad');
+        if (!titulo) return;
+        const texto = prompt('Escribe el mensaje', 'Hola, quisiera coordinar un nuevo servicio.');
+        if (!texto) return;
+
+        API_CLIENT.portal.proveedor.enviarMensaje(titulo, texto)
+          .then(() => init())
+          .catch((error) => alert(error?.message || 'No fue posible enviar el mensaje.'));
+      }
+
       async function init() {
-        const response = await fetch('/api/v1/portal/proveedor/mensajes');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
-        const mensajes = data.mensajes || [];
+        try {
+          const data = await API_CLIENT.portal.proveedor.mensajes();
+          const mensajes = data.mensajes || [];
+          mensajesActuales = mensajes;
 
-        mensajesContent.innerHTML = `
-          <div class="portal-breadcrumb">Panel de Proveedor > Mensajes</div>
-          <div class="provider-header">
-            <div>
-              <h1>Mensajes</h1>
-              <p>${mensajes.length} conversaciones activas</p>
-              <small>Gestiona la comunicación con productores desde una única bandeja.</small>
+          mensajesContent.innerHTML = `
+            <div class="portal-breadcrumb">Panel de Proveedor > Mensajes</div>
+            <div class="provider-header">
+              <div>
+                <h1>Mensajes</h1>
+                <p>${mensajes.length} conversaciones activas</p>
+                <small>Gestiona la comunicación con productores desde una única bandeja.</small>
+              </div>
+              <button class="btn btn-primary" type="button" id="newMessageBtn">Nuevo Mensaje</button>
             </div>
-            <a class="btn btn-primary" href="#">Nuevo Mensaje</a>
-          </div>
 
-          <section class="portal-card provider-messages">
-            ${mensajes.length
-              ? mensajes.map((m) => `<article><h3>${m.titulo}</h3><small>${m.fecha}</small><p>${m.texto}</p><a href="#">Responder</a></article>`).join('')
-              : '<p>No hay mensajes por ahora.</p>'}
-          </section>
-        `;
+            <section class="portal-card provider-messages">
+              ${mensajes.length
+                ? mensajes.map((m, index) => `<article><h3>${m.titulo}</h3><small>${m.fecha}</small><p>${m.texto}</p><a href="mailto:${index % 2 === 0 ? 'info@boyacafilm.gov.co' : 'contacto@boyacafilm.gov.co'}?subject=${encodeURIComponent(m.titulo)}">Responder</a></article>`).join('')
+                : '<p>No hay mensajes por ahora.</p>'}
+            </section>
+          `;
+
+          document.getElementById('newMessageBtn')?.addEventListener('click', abrirNuevoMensaje);
+        } catch (error) {
+          mensajesContent.innerHTML = `<article class="portal-card"><h1>No fue posible cargar los mensajes</h1><p>${error?.message || 'Intenta de nuevo más tarde.'}</p></article>`;
+        }
       }
 
       init();

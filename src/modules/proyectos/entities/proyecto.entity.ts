@@ -36,6 +36,18 @@ export class Proyecto {
   @Column({ type: 'numeric', precision: 15, scale: 2, nullable: true })
   presupuesto_total: number;
 
+  @Column({ length: 50, nullable: true })
+  tamano_equipo: string;
+
+  @Column({ length: 255, nullable: true })
+  contacto_principal: string;
+
+  @Column({ nullable: true })
+  servicio_requerido_id: number;
+
+  @Column({ length: 30, nullable: true })
+  telefono_contacto: string;
+
   @Column({ length: 50, default: 'borrador' })
   estado_proyecto: string;
 

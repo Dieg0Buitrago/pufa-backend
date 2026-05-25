@@ -28,31 +28,48 @@
       </section>
     </main>
 
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
       const pasantiasList = document.getElementById('pasantiasList');
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
+      function aplicarPasantia(item) {
+        const body = encodeURIComponent(`Hola, quiero aplicar a la pasantía ${item.proyecto} (${item.codigo}).`);
+        window.location.href = `mailto:info@boyacafilm.gov.co?subject=${encodeURIComponent(`Aplicación pasantía ${item.codigo}`)}&body=${body}`;
+      }
+
       async function init() {
-        const response = await fetch('/api/v1/portal/academico/pasantias');
-        const payload = await response.json();
-        const data = payload?.datos?.data || payload?.data || [];
+        try {
+          const response = await API_CLIENT.portal.academico.pasantias();
+          const data = response?.data || [];
 
-        if (!data.length) {
-          pasantiasList.innerHTML = '<article class="portal-card">No hay convocatorias activas.</article>';
-          return;
-        }
+          if (!data.length) {
+            pasantiasList.innerHTML = '<article class="portal-card">No hay convocatorias activas.</article>';
+            return;
+          }
 
-        pasantiasList.innerHTML = data.map((item) => `
+          pasantiasList.innerHTML = data.map((item) => `
           <article class="portal-card academico-vacante">
             <small>${item.codigo} · ${item.estado}</small>
             <h3>${item.proyecto}</h3>
             <p>${item.ciudad} · Inicio ${item.inicio}</p>
-            <div class="permit-actions"><a href="#">Aplicar Ahora</a><a href="#">Ver Detalles</a></div>
+            <div class="permit-actions"><a href="#" data-aplicar-pasantia="${item.codigo}">Aplicar Ahora</a><a href="#">Ver Detalles</a></div>
             <div class="academico-deadline">Fecha límite de aplicación: ${item.cierre}</div>
           </article>
         `).join('');
+
+          pasantiasList.querySelectorAll('[data-aplicar-pasantia]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+              event.preventDefault();
+              const vacante = data.find((entry) => entry.codigo === button.getAttribute('data-aplicar-pasantia'));
+              if (vacante) aplicarPasantia(vacante);
+            });
+          });
+        } catch (error) {
+          pasantiasList.innerHTML = `<article class="portal-card">No fue posible cargar convocatorias. ${error?.message || ''}</article>`;
+        }
       }
 
       init();

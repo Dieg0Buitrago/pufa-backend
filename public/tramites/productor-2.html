@@ -45,7 +45,7 @@
         <div class="portal-breadcrumb">Ventanilla Única > Mis Permisos</div>
         <div class="portal-head-row">
           <h1>Mis Permisos P.U.F.A.B.</h1>
-          <a class="btn btn-primary" href="#">+ Nueva Solicitud</a>
+          <a class="btn btn-primary" href="/crear-tramite/">+ Nueva Solicitud</a>
         </div>
 
         <div class="portal-tabs" id="permisosTabs">
@@ -99,7 +99,7 @@
                 </div>
                 <div class="timeline">${timeline}</div>
                 ${correcciones}
-                <div class="permit-actions"><a href="#">Ver Detalle</a><a href="#">Descargar</a></div>
+                <div class="permit-actions"><a href="/detalle-tramite/?id=${item.id}">Ver Detalle</a><a href="#">Descargar</a></div>
               </article>
             `;
           })
@@ -107,12 +107,16 @@
       }
 
       async function cargarPermisos() {
-        const params = new URLSearchParams();
-        if (estadoActual !== 'todos') params.set('estado', estadoActual);
-        const response = await fetch(`/api/v1/portal/productor/permisos?${params.toString()}`);
-        const payload = await response.json();
-        const data = payload?.datos?.data || payload?.data || [];
-        renderPermisos(data);
+        try {
+          const params = new URLSearchParams();
+          if (estadoActual !== 'todos') params.set('estado', estadoActual);
+          const response = await fetch(`/api/v1/portal/productor/permisos?${params.toString()}`);
+          const payload = await response.json();
+          const data = payload?.datos?.data || payload?.datos?.permisos || payload?.data || [];
+          renderPermisos(Array.isArray(data) ? data : []);
+        } catch (error) {
+          container.innerHTML = '<article class="portal-card">No fue posible cargar permisos. Intenta nuevamente.</article>';
+        }
       }
 
       tabs?.querySelectorAll('[data-estado]').forEach((tab) => {

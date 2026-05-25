@@ -117,6 +117,7 @@ export class UsuariosService {
 
     await this.usuariosRepo.update(usuarioId, {
       estado_cuenta_id: nuevoEstado.id,
+      activo: nuevoEstadoCodigo === 'activo',
       fecha_aprobacion: nuevoEstadoCodigo === 'activo' ? new Date() : undefined,
     });
 

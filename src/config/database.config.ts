@@ -1,16 +1,44 @@
 import { registerAs } from '@nestjs/config';
 
+function requireEnv(name: string) {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    throw new Error(`Falta la variable de entorno requerida: ${name}`);
+  }
+  return value.trim();
+}
+
 // Configuración de conexión a PostgreSQL vía TypeORM
-// Acepta DB_DATABASE o DB_NAME, NODE_ENV o APP_ENV
 export default registerAs('database', () => {
   const env = process.env.NODE_ENV ?? process.env.APP_ENV ?? 'development';
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+
+  if (databaseUrl) {
+    const parsed = new URL(databaseUrl);
+    const databaseFromUrl = parsed.pathname.replace(/^\//, '');
+    return {
+      type: 'postgres',
+      url: databaseUrl,
+      database: databaseFromUrl,
+      entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+      synchronize: env === 'development',
+      logging: env === 'development',
+      autoLoadEntities: true,
+    };
+  }
+
+  const database = process.env.DB_DATABASE?.trim() || process.env.DB_NAME?.trim();
+  if (!database) {
+    throw new Error('Falta la variable de entorno requerida: DB_DATABASE, DB_NAME o DATABASE_URL');
+  }
+
   return {
     type: 'postgres',
-    host: process.env.DB_HOST ?? 'localhost',
-    port: parseInt(process.env.DB_PORT ?? '5432', 10),
-    username: process.env.DB_USERNAME ?? 'postgres',
-    password: process.env.DB_PASSWORD ?? 'password',
-    database: process.env.DB_DATABASE ?? process.env.DB_NAME ?? 'pufa_db',
+    host: requireEnv('DB_HOST'),
+    port: parseInt(requireEnv('DB_PORT'), 10),
+    username: requireEnv('DB_USERNAME'),
+    password: requireEnv('DB_PASSWORD'),
+    database,
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     synchronize: env === 'development',
     logging: env === 'development',

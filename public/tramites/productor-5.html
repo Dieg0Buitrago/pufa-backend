@@ -43,6 +43,7 @@
       <section class="portal-content">
         <div class="portal-breadcrumb">Ventanilla Única > Evaluaciones</div>
         <h1>Evaluaciones y Observaciones</h1>
+        <p style="color: var(--muted); margin: 0 0 1.25rem; max-width: 720px;">Aquí verás lo que el comité revisa de tu solicitud: las observaciones son las correcciones o aclaraciones que debes responder, y los documentos requeridos son los soportes que faltan por cargar o actualizar.</p>
 
         <article class="portal-card" id="evaluacionCard">Cargando evaluación...</article>
       </section>
@@ -55,30 +56,43 @@
       menuToggle?.addEventListener('click', () => navLinks?.classList.toggle('open'));
 
       async function cargarEvaluacion() {
-        const response = await fetch('/api/v1/portal/productor/evaluaciones');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
-        evaluacionCard.innerHTML = `
-          <div class="permit-top">
-            <div>
-              <small>${data.codigo} · ${data.permiso}</small>
-              <h3>${data.proyecto}</h3>
-              <p>${data.comite}</p>
+        try {
+          const response = await fetch('/api/v1/portal/productor/evaluaciones');
+          const payload = await response.json();
+          const data = payload?.datos || payload;
+
+          if (Array.isArray(data)) {
+            evaluacionCard.innerHTML = `
+              <h3>Evaluaciones de Proveedores</h3>
+              ${data.map((item) => `<div class="alert-item info"><strong>${item.proveedor}</strong><span>Promedio ${item.promedio} (${item.reseñas} reseñas)</span></div>`).join('')}
+            `;
+            return;
+          }
+
+          evaluacionCard.innerHTML = `
+            <div class="permit-top">
+              <div>
+                <small>${data.codigo} · ${data.permiso}</small>
+                <h3>${data.proyecto}</h3>
+                <p>${data.comite}</p>
+              </div>
+              <span class="status-badge warning">Responder antes de ${data.fecha_limite || 'N/A'}</span>
             </div>
-            <span class="status-badge warning">Responder antes de ${data.fecha_limite}</span>
-          </div>
-          <div class="portal-grid-2">
-            <div class="alert-list">
-              <strong>Observaciones del Comité</strong>
-              ${data.observaciones.map((item) => `<span>${item}</span>`).join('')}
+            <div class="portal-grid-2">
+              <div class="alert-list">
+                <strong>Observaciones del Comité</strong>
+                ${(data.observaciones || []).map((item) => `<span>${item}</span>`).join('')}
+              </div>
+              <div class="portal-card">
+                <h3>Documentos Requeridos</h3>
+                ${(data.documentos_requeridos || []).map((doc) => `<div class="permit-actions"><a href="#">${doc}</a><a href="#">Subir</a></div>`).join('')}
+              </div>
             </div>
-            <div class="portal-card">
-              <h3>Documentos Requeridos</h3>
-              ${(data.documentos_requeridos || []).map((doc) => `<div class="permit-actions"><a href="#">${doc}</a><a href="#">Subir</a></div>`).join('')}
-            </div>
-          </div>
-          <a class="btn btn-primary full" href="#">Enviar Respuesta al Comité</a>
-        `;
+            <a class="btn btn-primary full" href="/crear-tramite/">Enviar Respuesta al Comité</a>
+          `;
+        } catch (error) {
+          evaluacionCard.innerHTML = 'No fue posible cargar la evaluación.';
+        }
       }
 
       cargarEvaluacion();

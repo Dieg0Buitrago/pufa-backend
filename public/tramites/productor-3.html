@@ -82,6 +82,25 @@
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
       }
 
+      function buildReservationUrl(locacion) {
+        const params = new URLSearchParams();
+        params.set('locacion', locacion.id_unico || locacion.id || locacion.nombre || '');
+        params.set('nombre', locacion.nombre || '');
+        return `/crear-tramite/?${params.toString()}`;
+      }
+
+      function reservarLocacion(locacion) {
+        const selected = {
+          id_unico: locacion.id_unico || locacion.id || '',
+          nombre_lugar: locacion.nombre || '',
+          municipio_nombre: locacion.provincia || '',
+          tipo_espacio_nombre: locacion.tipo || '',
+          observaciones: `Reserva iniciada desde el catálogo de locaciones para ${locacion.nombre || 'esta locación'}.`,
+        };
+        localStorage.setItem('pufab_reserva_locacion', JSON.stringify(selected));
+        window.location.href = buildReservationUrl(selected);
+      }
+
       function renderLocaciones(items) {
         if (!items.length) {
           catalogGrid.innerHTML = '<article class="portal-card">No hay locaciones para este filtro.</article>';
@@ -97,12 +116,16 @@
                   <small>${item.tipo} · ${item.provincia}</small>
                   <h3>${item.nombre}</h3>
                   <p>${moneda(item.precio)} día</p>
-                  <a href="#">Reservar</a>
+                  <button type="button" data-reservar-locacion="${item.id || item.id_unico}" style="background:none;border:none;padding:0;color:var(--green-700);font-weight:700;cursor:pointer;text-decoration:underline;">Reservar</button>
                 </div>
               </article>
             `,
           )
           .join('');
+
+        catalogGrid.querySelectorAll('[data-reservar-locacion]').forEach((btn, index) => {
+          btn.addEventListener('click', () => reservarLocacion(items[index]));
+        });
       }
 
       async function cargarLocaciones() {

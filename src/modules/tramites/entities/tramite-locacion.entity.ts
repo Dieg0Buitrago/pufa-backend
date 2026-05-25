@@ -20,6 +20,12 @@ export class TramiteLocacion {
   @Column({ nullable: true })
   tipo_espacio_id: number;
 
+  @Column({ length: 30, nullable: true })
+  origen_tipo: string;
+
+  @Column({ nullable: true })
+  origen_id: number;
+
   @Column({ length: 255 })
   nombre_lugar: string;
 

@@ -1,24 +1,31 @@
 import {
-  Injectable, NotFoundException, ForbiddenException, BadRequestException,
+  Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
 import { Tramite } from './entities/tramite.entity';
 import { TramiteLocacion } from './entities/tramite-locacion.entity';
 import { TramiteEquipoTecnico } from './entities/tramite-equipo-tecnico.entity';
 import { HistorialTramite } from './entities/historial-tramite.entity';
 import { EstadoTramite } from '../catalogos/entities/estado-tramite.entity';
 import { CrearTramiteDto } from './dto/crear-tramite.dto';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Proyecto } from '../proyectos/entities/proyecto.entity';
 
 @Injectable()
 export class TramitesService {
+  private readonly logger = new Logger(TramitesService.name);
+
   constructor(
     @InjectRepository(Tramite) private tramitesRepo: Repository<Tramite>,
     @InjectRepository(TramiteLocacion) private locacionesRepo: Repository<TramiteLocacion>,
     @InjectRepository(TramiteEquipoTecnico) private equipoRepo: Repository<TramiteEquipoTecnico>,
     @InjectRepository(HistorialTramite) private historialRepo: Repository<HistorialTramite>,
     @InjectRepository(EstadoTramite) private estadosTramiteRepo: Repository<EstadoTramite>,
+    @InjectRepository(Usuario) private usuariosRepo: Repository<Usuario>,
+    @InjectRepository(Proyecto) private proyectosRepo: Repository<Proyecto>,
     private configService: ConfigService,
   ) {}
 
@@ -54,7 +61,10 @@ export class TramitesService {
       where: { id },
       relations: [
         'estado_tramite', 'tipo_tramite', 'proyecto',
-        'locaciones', 'equipo_tecnico', 'historial',
+        'usuario_solicitante',
+        'locaciones', 'locaciones.tipo_espacio', 'locaciones.municipio',
+        'equipo_tecnico', 'equipo_tecnico.rol_equipo_tecnico',
+        'historial', 'historial.estado_anterior', 'historial.estado_nuevo', 'historial.usuario_actor',
       ],
     });
     if (!tramite) throw new NotFoundException(`Trámite #${id} no encontrado`);
@@ -128,7 +138,80 @@ export class TramitesService {
       }),
     );
 
+    await this.enviarNotificacionCreacionTramite(usuarioId, dto.proyecto_id, numeroRadicado);
+
     return tramiteGuardado;
+  }
+
+  private async enviarNotificacionCreacionTramite(
+    usuarioId: number,
+    proyectoId: number,
+    numeroRadicado: string,
+  ) {
+    const smtpHost = this.configService.get<string>('app.smtpHost');
+    const smtpPort = this.configService.get<number>('app.smtpPort', 587);
+    const smtpSecure = this.configService.get<boolean>('app.smtpSecure', false);
+    const smtpUser = this.configService.get<string>('app.smtpUser');
+    const smtpPass = this.configService.get<string>('app.smtpPass');
+    const smtpFrom = this.configService.get<string>('app.smtpFrom');
+    const smtpAdminTo = this.configService.get<string>('app.smtpAdminTo');
+
+    if (!smtpHost || !smtpFrom || !smtpUser || !smtpPass) {
+      return;
+    }
+
+    try {
+      const [usuario, proyecto] = await Promise.all([
+        this.usuariosRepo.findOne({ where: { id: usuarioId } }),
+        this.proyectosRepo.findOne({ where: { id: proyectoId } }),
+      ]);
+
+      if (!usuario?.email) {
+        return;
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      const nombreProyecto = proyecto?.nombre_proyecto ?? `Proyecto #${proyectoId}`;
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: usuario.email,
+        subject: `PUFAB: Tu permiso está en trámite de aprobación (${numeroRadicado})`,
+        html: `
+          <h2>Tu permiso está en trámite de aprobación</h2>
+          <p>Recibimos tu solicitud de permiso y ya está en proceso de revisión.</p>
+          <p><strong>Radicado:</strong> ${numeroRadicado}</p>
+          <p><strong>Proyecto:</strong> ${nombreProyecto}</p>
+          <p>Te notificaremos cuando cambie de estado. Conserva este número para el seguimiento.</p>
+        `,
+      });
+
+      if (smtpAdminTo && smtpAdminTo !== usuario.email) {
+        await transporter.sendMail({
+          from: smtpFrom,
+          to: smtpAdminTo,
+          subject: `PUFAB: nuevo trámite pendiente de revisión (${numeroRadicado})`,
+          html: `
+            <h2>Nuevo trámite pendiente de revisión</h2>
+            <p>Un usuario envió un trámite que requiere validación.</p>
+            <p><strong>Radicado:</strong> ${numeroRadicado}</p>
+            <p><strong>Proyecto:</strong> ${nombreProyecto}</p>
+            <p><strong>Solicitante:</strong> ${usuario.email}</p>
+          `,
+        });
+      }
+    } catch (error: any) {
+      this.logger.warn(`No se pudo enviar correo de confirmación del trámite ${numeroRadicado}: ${error?.message ?? error}`);
+    }
   }
 
   // Cambia el estado de un trámite (admin/revisor)

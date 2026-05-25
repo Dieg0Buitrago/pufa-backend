@@ -12,7 +12,7 @@
         <a class="portal-link" href="/admin/">Resumen</a>
         <a class="portal-link" href="/admin/admin-2.html">Usuarios y Accesos</a>
         <a class="portal-link" href="/admin/admin-3.html">Verificación de Perfiles</a>
-        <a class="portal-link" href="/admin/admin-4.html">Gestión de Activos</a>
+        <a class="portal-link" href="/admin/admin-4.html">Gestión de Locaciones</a>
         <a class="portal-link" href="/admin/admin-5.html">Flujo de Permisos</a>
         <a class="portal-link" href="/admin/admin-6.html">Comités Técnicos</a>
         <a class="portal-link active" href="/admin/admin-7.html">Finanzas y Reservas</a>
@@ -33,35 +33,54 @@
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v || 0);
       }
 
-      function estadoClass(value) {
-        const v = String(value || '').toLowerCase();
-        if (v.includes('pag')) return 'success';
-        if (v.includes('reem')) return 'warning';
-        return 'muted';
-      }
-
       async function load() {
-        const response = await fetch('/api/v1/portal/admin/finanzas');
-        const payload = await response.json();
-        const data = payload?.datos || payload;
+        try {
+          const response = await fetch('/api/v1/portal/admin/finanzas');
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Error al cargar finanzas`);
+          }
+          
+          const payload = await response.json();
+          const metrics = payload?.metrics || {
+            ingresos_mes: 0,
+            pendientes: 0,
+            reembolsos: 0,
+            reservas_activas: 0
+          };
+          const reservas = payload?.reservas || [];
 
-        finanzasContent.innerHTML = `
-          <div class="portal-breadcrumb">Panel Administrativo > Finanzas y Reservas</div>
-          <h1>Control Financiero y Reservas</h1>
-          <div class="admin-metrics">
-            <article><strong>${money(data.metrics.ingresos_mes)}</strong><span>Ingresos del Mes</span></article>
-            <article><strong>${money(data.metrics.pendientes)}</strong><span>Pendientes</span></article>
-            <article><strong>${money(data.metrics.reembolsos)}</strong><span>Reembolsos</span></article>
-            <article><strong>${data.metrics.reservas_activas}</strong><span>Reservas Activas</span></article>
-          </div>
-          <section class="portal-card">
-            <h3>Reservas Recientes</h3>
-            <div class="admin-table">
-              <div class="admin-table-head"><span>ID</span><span>Cliente</span><span>Servicio</span><span>Monto</span><span>Estado</span></div>
-              ${(data.reservas || []).map((r) => `<div class="admin-table-row"><span>${r.id}</span><span>${r.cliente}</span><span>${r.servicio}</span><span>${money(r.monto)}</span><span><i class="status-badge ${estadoClass(r.estado)}">${r.estado}</i></span></div>`).join('')}
+          finanzasContent.innerHTML = `
+            <div class="portal-breadcrumb">Panel Administrativo > Finanzas y Reservas</div>
+            <h1>Control Financiero y Reservas</h1>
+            <div class="admin-metrics">
+              <article><strong>${money(metrics.ingresos_mes)}</strong><span>Ingresos del Mes</span></article>
+              <article><strong>${money(metrics.pendientes)}</strong><span>Pendientes de Pago</span></article>
+              <article><strong>${money(metrics.reembolsos)}</strong><span>Reembolsos</span></article>
+              <article><strong>${metrics.reservas_activas}</strong><span>Trámites Activos</span></article>
             </div>
-          </section>
-        `;
+            <section class="portal-card">
+              <h3>Proyectos Recientes</h3>
+              <div class="admin-table">
+                <div class="admin-table-head"><span>Radicado</span><span>Productora</span><span>Locación</span><span>Presupuesto</span><span>Estado</span></div>
+                ${reservas && reservas.length > 0 
+                  ? reservas.map((r) => `<div class="admin-table-row"><span><strong>${r.id || 'N/A'}</strong></span><span>${r.cliente || 'N/A'}</span><span>${r.servicio || 'N/A'}</span><span>${money(r.monto || 0)}</span><span><i class="status-badge ${(String(r.estado || '').toLowerCase().includes('pago') ? 'success' : String(r.estado || '').toLowerCase().includes('reembol') ? 'warning' : 'muted')}">${r.estado || 'Pendiente'}</i></span></div>`).join('')
+                  : '<div style="padding: 1rem; text-align: center; color: #999; grid-column: 1/-1;">No hay datos financieros disponibles</div>'}
+              </div>
+            </section>
+          `;
+        } catch (error) {
+          console.error('Error en finanzas:', error);
+          finanzasContent.innerHTML = `
+            <div class="portal-breadcrumb">Panel Administrativo > Finanzas y Reservas</div>
+            <h1>Control Financiero y Reservas</h1>
+            <div style="background: #fff3cd; padding: 1.5rem; border-radius: 8px; color: #856404;">
+              <strong>⚠ No se pudieron cargar los datos financieros</strong><br>
+              <small>${error.message}</small><br><br>
+              <button onclick="location.reload()" style="padding: 0.5rem 1rem; background: #ffc107; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Reintentar</button>
+            </div>
+          `;
+        }
       }
 
       load();

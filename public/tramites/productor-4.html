@@ -69,6 +69,19 @@
         return payload?.datos ?? payload?.data ?? payload;
       }
 
+      function buildContactLinks(item) {
+        const email = item?.usuario?.email || item?.contacto?.email || '';
+        const phone = item?.usuario?.telefono || item?.contacto?.telefono || '';
+        const providerName = item?.usuario?.email ? item.usuario.email.split('@')[0].replaceAll('.', ' ') : `Proveedor ${item.id}`;
+        const subject = encodeURIComponent(`PUFAB: contacto con ${providerName}`);
+        const body = encodeURIComponent(`Hola ${providerName}, quisiera obtener más información sobre sus servicios publicados en el directorio de PUFAB.`);
+
+        const emailHref = email ? `mailto:${email}?subject=${subject}&body=${body}` : '/contacto/';
+        const whatsappHref = phone ? `https://wa.me/${String(phone).replace(/\D/g, '')}?text=${body}` : emailHref;
+
+        return { emailHref, whatsappHref };
+      }
+
       function renderProviders(items) {
         totalProveedores.textContent = `${items.length} resultados`;
         if (!items.length) {
@@ -81,6 +94,7 @@
             const name = item?.usuario?.email ? item.usuario.email.split('@')[0].replaceAll('.', ' ') : `Proveedor ${item.id}`;
             const subcats = (item?.subcategorias || []).map((s) => s.nombre).slice(0, 3);
             const especialidades = (item?.especialidades || []).map((e) => e.nombre).slice(0, 3);
+            const { emailHref, whatsappHref } = buildContactLinks(item);
             return `
               <article class="provider-card">
                 <div>
@@ -88,7 +102,10 @@
                   <small>${item?.descripcion_perfil || 'Proveedor audiovisual verificado'}</small>
                   <div class="provider-tags">${subcats.map((t) => `<span>${t}</span>`).join('')}${especialidades.map((t) => `<span>${t}</span>`).join('')}</div>
                 </div>
-                <a class="btn btn-primary" href="#">Contactar</a>
+                <div style="display:flex; gap: 0.75rem; flex-wrap: wrap; justify-content:flex-end;">
+                  <a class="btn btn-primary" href="${emailHref}">Contactar</a>
+                  <a class="btn btn-light" href="${whatsappHref}" target="_blank" rel="noreferrer">WhatsApp</a>
+                </div>
               </article>
             `;
           })

@@ -3,8 +3,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DataSource } from 'typeorm';
 import { join } from 'path';
-import { createServer } from 'net';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RespuestaInterceptor } from './common/interceptors/respuesta.interceptor';
@@ -23,36 +23,71 @@ function warnIfNodeVersionIsNotLts() {
   }
 }
 
-async function getAvailablePort(preferredPort: number, maxTries = 20): Promise<number> {
+async function listenWithFallback(
+  app: NestExpressApplication,
+  preferredPort: number,
+  maxTries = 20,
+): Promise<number> {
   for (let i = 0; i < maxTries; i += 1) {
     const candidate = preferredPort + i;
-    const isFree = await new Promise<boolean>((resolve) => {
-      const tester = createServer();
-      tester.once('error', () => resolve(false));
-      tester.once('listening', () => {
-        tester.close(() => resolve(true));
-      });
-      tester.listen(candidate, '0.0.0.0');
-    });
-
-    if (isFree) {
+    try {
+      await app.listen(candidate, '0.0.0.0');
       return candidate;
+    } catch (error: any) {
+      if (error?.code !== 'EADDRINUSE') {
+        throw error;
+      }
     }
   }
 
-  return preferredPort;
+  throw new Error(`No fue posible iniciar la aplicación. Puertos ocupados desde ${preferredPort} hasta ${preferredPort + maxTries - 1}.`);
 }
 
 async function bootstrap() {
   warnIfNodeVersionIsNotLts();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const dataSource = app.get(DataSource);
+  const configService = app.get(ConfigService);
+
+  // Fail-fast: no iniciar API si PostgreSQL no está disponible o la BD no coincide.
+  if (!dataSource.isInitialized) {
+    throw new Error('No se pudo inicializar la conexión a PostgreSQL. Verifica que el servidor y la base de datos estén disponibles.');
+  }
+
+  const expectedDb = String(configService.get('database.database') || '').trim();
+  const dbResult = await dataSource.query('SELECT current_database() AS db_name');
+  const connectedDb = String(dbResult?.[0]?.db_name || '').trim();
+  if (!connectedDb) {
+    throw new Error('No se pudo detectar la base de datos activa en PostgreSQL.');
+  }
+  if (expectedDb && connectedDb !== expectedDb) {
+    throw new Error(`Base de datos incorrecta: conectada a "${connectedDb}" pero se esperaba "${expectedDb}".`);
+  }
+
+  // Validación adicional: confirma que es la base operativa esperada (no una BD vacía).
+  const requiredTables = ['usuarios', 'tramites', 'documentos'];
+  const tablesResult = await dataSource.query(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+    `,
+  );
+  const existingTables = new Set((tablesResult || []).map((row: any) => String(row.table_name || '').trim()));
+  const missingTables = requiredTables.filter((table) => !existingTables.has(table));
+
+  if (missingTables.length > 0) {
+    throw new Error(
+      `La conexión a PostgreSQL existe, pero la BD "${connectedDb}" no tiene tablas requeridas: ${missingTables.join(', ')}.`,
+    );
+  }
 
   // Archivos estáticos para la landing pública
   app.useStaticAssets(join(process.cwd(), 'public'));
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
   // Prefijo global de la API versionada
-  const configService = app.get(ConfigService);
   const prefix = configService.get<string>('app.prefix', 'api/v1');
   app.setGlobalPrefix(prefix);
 
@@ -122,8 +157,7 @@ async function bootstrap() {
   });
 
   const preferredPort = configService.get<number>('app.port', 3000);
-  const port = await getAvailablePort(preferredPort);
-  await app.listen(port);
+  const port = await listenWithFallback(app, preferredPort);
   if (port !== preferredPort) {
     console.warn(`Puerto ${preferredPort} ocupado. Se inició en el puerto ${port}.`);
   }

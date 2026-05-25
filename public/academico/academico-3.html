@@ -33,6 +33,7 @@
       </section>
     </main>
 
+    <script src="/api-client.js"></script>
     <script>
       const menuToggle = document.getElementById('menuToggle');
       const navLinks = document.getElementById('navLinks');
@@ -60,12 +61,12 @@
       }
 
       async function cargar() {
-        const params = new URLSearchParams();
-        if (buscarCurso.value.trim()) params.set('q', buscarCurso.value.trim());
-        const response = await fetch(`/api/v1/portal/academico/capacitacion?${params.toString()}`);
-        const payload = await response.json();
-        const data = payload?.datos?.data || payload?.data || [];
-        render(data);
+        try {
+          const data = await API_CLIENT.portal.academico.capacitacion(buscarCurso.value.trim());
+          render(data?.data || []);
+        } catch (error) {
+          cursosGrid.innerHTML = `<article class="portal-card">No fue posible cargar los tutoriales. ${error?.message || ''}</article>`;
+        }
       }
 
       buscarCurso?.addEventListener('input', cargar);

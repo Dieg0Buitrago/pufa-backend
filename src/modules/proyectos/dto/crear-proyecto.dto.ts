@@ -36,4 +36,24 @@ export class CrearProyectoDto {
   @IsNumber()
   @IsPositive()
   presupuesto_total?: number;
+
+  @ApiPropertyOptional({ example: 'mediano', description: 'Tamaño del equipo de producción' })
+  @IsOptional()
+  @IsString()
+  tamano_equipo?: string;
+
+  @ApiPropertyOptional({ example: 'María Rodríguez', description: 'Nombre del contacto principal del proyecto' })
+  @IsOptional()
+  @IsString()
+  contacto_principal?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del servicio seleccionado desde el portafolio de proveedor' })
+  @IsOptional()
+  @IsNumber()
+  servicio_requerido_id?: number;
+
+  @ApiPropertyOptional({ example: '+57 300 123 4567', description: 'Teléfono de contacto principal' })
+  @IsOptional()
+  @IsString()
+  telefono_contacto?: string;
 }

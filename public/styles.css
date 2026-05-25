@@ -1,13 +1,16 @@
 :root {
-  --green-900: #004d08;
-  --green-700: #009300;
-  --yellow: #fcd116;
-  --text: #1f2937;
-  --muted: #4b5563;
-  --bg-soft: #f5f5f5;
-  --white: #ffffff;
+  --accent-900: #0a84ff;
+  --accent-700: #007aff;
+  --green-900: #1e4620;
+  --green-700: #2d7e3e;
+  --yellow: #e8d033;
+  --neutral-900: #1c1c1e;
+  --muted: #6b6b70;
+  --bg-soft: #f7f7f8;
+  --surface: #ffffff;
   --radius: 14px;
-  --shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+  --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-strong: 0 20px 40px rgba(15, 23, 42, 0.08);
 }
 
 * {
@@ -18,9 +21,9 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: "Nunito Sans", sans-serif;
-  color: var(--text);
-  background: var(--white);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif;
+  color: var(--neutral-900);
+  background: linear-gradient(180deg, #fbfbfc 0%, var(--bg-soft) 100%);
   scroll-behavior: smooth;
 }
 
@@ -35,11 +38,16 @@ a {
 }
 
 .gov-header {
-  background: var(--green-700);
+  background-color: var(--green-700);
+  background-image: none;
   color: #f5fffa;
   position: sticky;
   top: 0;
   z-index: 80;
+  opacity: 1;
+  backdrop-filter: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .gov-header-inner {
@@ -61,6 +69,16 @@ a {
   opacity: 0.92;
 }
 
+.gov-links a {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.gov-links a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .flag-strip {
   height: 4px;
   background: linear-gradient(90deg, #fcd116 0 50%, #003893 50% 75%, #ce1126 75% 100%);
@@ -70,11 +88,14 @@ a {
   position: sticky;
   top: 52px;
   z-index: 70;
-  backdrop-filter: blur(10px);
-  background: rgba(0, 77, 8, 0.4);
+  backdrop-filter: blur(14px) saturate(145%);
+  background: rgba(8, 66, 18, 0.46);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .site-nav-inner {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -88,6 +109,18 @@ a {
   gap: 10px;
   font-weight: 700;
   color: #fff;
+  font-size: 22px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(14, 86, 25, 0.98), rgba(8, 66, 18, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .brand-icon {
@@ -104,24 +137,49 @@ a {
 }
 
 .nav-links {
+  position: relative;
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  padding-bottom: 8px;
 }
 
 .nav-links a {
+  position: relative;
   color: rgba(255, 255, 255, 0.92);
   font-weight: 600;
   font-size: 14px;
   padding: 8px 14px;
   border-radius: 8px;
+  transition: color 0.22s ease, background-color 0.22s ease, transform 0.22s ease;
 }
 
 .nav-links a:hover {
   background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
 }
 
 .nav-links a.active {
-  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.nav-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(232, 208, 51, 0.95), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 6px 16px rgba(232, 208, 51, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(0) scaleX(0.85);
+  transform-origin: left center;
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), width 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
+  will-change: transform, width, opacity;
 }
 
 .nav-cta {
@@ -143,7 +201,9 @@ a {
 
 .btn-primary {
   color: #fff;
-  background: var(--green-700);
+  background: linear-gradient(180deg, var(--accent-700), var(--accent-900));
+  border-radius: 12px;
+  padding: 10px 18px;
 }
 
 .btn-ghost {
@@ -323,10 +383,26 @@ a {
 }
 
 .card {
-  background: #fff;
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: 16px;
   padding: 22px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  object-fit: contain;
 }
 
 .card h3 {
@@ -415,6 +491,23 @@ a {
 
 .about-panel li {
   margin-bottom: 8px;
+}
+
+.about-media-tilted {
+  transform: rotate(-4deg);
+  box-shadow: -20px 30px 50px rgba(0, 0, 0, 0.15) !important;
+  overflow: visible;
+  border-radius: 12px;
+}
+
+.about-media-tilted img {
+  border-radius: 12px;
+  transform: rotate(4deg);
+  transition: transform 0.3s ease;
+}
+
+.about-media-tilted:hover img {
+  transform: rotate(2deg) scale(1.02);
 }
 
 .location-grid {
@@ -614,6 +707,21 @@ a {
   color: #4b5563;
 }
 
+.map-section {
+  min-height: 400px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.map-section iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
 .contact-form {
   background: #fff;
   border-radius: 16px;
@@ -650,9 +758,11 @@ a {
 }
 
 .site-footer {
-  background: var(--green-900);
-  color: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(180deg, #163717 0%, #102912 100%);
+  color: rgba(255, 255, 255, 0.92);
   padding-top: 64px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.12);
 }
 
 .footer-grid {
@@ -677,7 +787,8 @@ a {
 .footer-grid p {
   display: block;
   margin: 8px 0;
-  color: rgba(255, 255, 255, 0.76);
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
 }
 
 .socials {
@@ -691,7 +802,7 @@ a {
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font-weight: 700;
 }
@@ -1158,8 +1269,9 @@ a {
 
 .auth-tabs {
   --tab-index: 2;
+  --tab-count: 4;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   position: relative;
   isolation: isolate;
   margin-bottom: 14px;
@@ -1177,7 +1289,7 @@ a {
   position: absolute;
   top: 6px;
   left: 6px;
-  width: calc((100% - 12px) / 4);
+  width: calc((100% - 12px) / var(--tab-count));
   height: calc(100% - 12px);
   border-radius: 12px;
   transform: translateX(calc(var(--tab-index) * 100%));
@@ -1212,10 +1324,28 @@ a {
   position: relative;
   z-index: 1;
   transition: color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .auth-tab.active {
-  color: #0f172a;
+  color: var(--neutral-900);
+  /* allow active tab to wrap and show full label */
+  white-space: normal;
+  text-overflow: clip;
+}
+
+/* Constrain file inputs to their container to avoid overflow in admin pages */
+input[type="file"] {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ensure file inputs inside portal cards wrap nicely */
+.portal-card input[type="file"] {
+  width: 100%;
+  padding: 8px;
 }
 
 .auth-banner {

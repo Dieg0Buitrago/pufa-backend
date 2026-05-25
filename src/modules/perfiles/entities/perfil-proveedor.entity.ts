@@ -31,6 +31,18 @@ export class PerfilProveedor {
   @Column({ default: false })
   verificado: boolean;
 
+  @Column({ type: 'varchar', length: 50, default: 'pendiente' })
+  estado: string; // 'pendiente', 'aprobado', 'rechazado'
+
+  @Column({ length: 20, nullable: true })
+  telefono: string;
+
+  @Column({ type: 'text', nullable: true })
+  motivo_rechazo: string | null;
+
+  @Column({ default: true })
+  activo: boolean;
+
   @CreateDateColumn()
   fecha_creacion: Date;
 

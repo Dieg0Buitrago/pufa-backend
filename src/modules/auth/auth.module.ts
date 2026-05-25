@@ -11,6 +11,8 @@ import { Permiso } from './entities/permiso.entity';
 import { UsuarioRol } from './entities/usuario-rol.entity';
 import { RolPermiso } from './entities/rol-permiso.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { PersonaNatural } from '../usuarios/entities/persona-natural.entity';
+import { PersonaJuridica } from '../usuarios/entities/persona-juridica.entity';
 import { EstadoCuenta } from '../catalogos/entities/estado-cuenta.entity';
 import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
 
@@ -37,6 +39,8 @@ import { TipoPerfil } from '../catalogos/entities/tipo-perfil.entity';
       UsuarioRol,
       RolPermiso,
       Usuario,
+      PersonaNatural,
+      PersonaJuridica,
       EstadoCuenta,
       TipoPerfil,
     ]),
